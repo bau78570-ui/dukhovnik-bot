@@ -1,0 +1,24 @@
+name: Деплой Духовник
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH на сервер и обновление бота
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: 194.87.151.196
+          username: botuser
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            cd /opt/dukhovnik_bot
+            git checkout main
+            git pull origin main
+            systemctl --user restart dukhovnik-bot || systemctl restart dukhovnik-bot
+            echo "Духовник обновлён $(date)"
+
