@@ -3,6 +3,7 @@ import logging
 import os
 import sys # Добавляем импорт sys
 
+
 # Проверяем, активно ли виртуальное окружение
 if not hasattr(sys, 'real_prefix') and not (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix):
     logging.warning("Виртуальное окружение не активно. Пожалуйста, убедитесь, что вы запускаете скрипт в активированном .venv.")
