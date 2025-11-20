@@ -7,3 +7,4 @@ aiogram==3.13.1
 beautifulsoup4
 icalendar
 apscheduler==3.11.1
+yookassa
