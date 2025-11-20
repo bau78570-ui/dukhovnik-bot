@@ -60,6 +60,18 @@ class AccessCheckerMiddleware(BaseMiddleware):
         print("\n--- Access Check Started ---")
         print(f"User ID: {user_id}, Admin ID from .env: {ADMIN_ID}")
 
+        # Команды, которые должны работать без проверки доступа
+        allowed_commands = ['/start', '/subscribe', '/terms', '/support']
+        
+        # Проверяем, является ли это командой, которую нужно пропустить
+        if isinstance(event, Message) and event.text:
+            # Извлекаем команду из текста (учитываем формат /command или /command@botname)
+            command_text = event.text.split()[0].split('@')[0] if event.text else ""
+            if command_text in allowed_commands:
+                print(f"INFO: Command {command_text} is allowed without access check. Access GRANTED.")
+                print("--- Access Check Finished ---\n")
+                return await handler(event, data)
+
         # Шаг 1: Проверка на Администратора
         if str(user_id) == str(ADMIN_ID):
             print("RESULT: User is ADMIN. Access GRANTED.")
@@ -86,21 +98,33 @@ class AccessCheckerMiddleware(BaseMiddleware):
             print("--- Access Check Finished ---\n")
             return await handler(event, data)
         else:
-            print("INFO: Subscription is not active. Proceeding to deny access.")
+            print("INFO: Subscription is not active. Proceeding to check for trial activation.")
         
-        # Шаг 4: Отказ в доступе
-        print("RESULT: No access rights found. Access DENIED.")
-        print("--- Access Check Finished ---\n")
-        no_access_text = (
-            "✨ <b>Эта функция — часть Premium-доступа.</b>\n\n"
-            "Она открывает безграничное общение с AI-Собеседником и доступ к эксклюзивным материалам для вашего духовного роста.\n\n"
-            "Позвольте себе этот дар! Нажмите /subscribe, чтобы присоединиться."
-        )
-        if isinstance(event, Message):
-            await event.answer(no_access_text, parse_mode='HTML')
-        elif isinstance(event, CallbackQuery):
-            await event.message.answer(no_access_text, parse_mode='HTML')
-        return
+        # Шаг 4: Автоматическая активация пробного периода для новых пользователей
+        user_data = get_user(user_id)
+        trial_start = user_data.get('trial_start_date')
+        
+        if trial_start is None:
+            # Пробный период еще не был активирован - активируем его автоматически
+            print("INFO: Trial period has never been activated. Activating trial automatically...")
+            await activate_trial(user_id)
+            print(f"RESULT: Trial period activated automatically. Access GRANTED for {TRIAL_DURATION_DAYS} days.")
+            print("--- Access Check Finished ---\n")
+            return await handler(event, data)
+        else:
+            # Пробный период был активирован ранее, но истек
+            print("RESULT: Trial period was activated previously but has expired. Access DENIED.")
+            print("--- Access Check Finished ---\n")
+            no_access_text = (
+                "✨ <b>Эта функция — часть Premium-доступа.</b>\n\n"
+                "Она открывает безграничное общение с AI-Собеседником и доступ к эксклюзивным материалам для вашего духовного роста.\n\n"
+                "Позвольте себе этот дар! Нажмите /subscribe, чтобы присоединиться."
+            )
+            if isinstance(event, Message):
+                await event.answer(no_access_text, parse_mode='HTML')
+            elif isinstance(event, CallbackQuery):
+                await event.message.answer(no_access_text, parse_mode='HTML')
+            return
 
 # Главный декоратор (middleware)
 check_access = AccessCheckerMiddleware()
