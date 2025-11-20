@@ -37,6 +37,12 @@ def get_settings_keyboard(user_id: int) -> InlineKeyboardBuilder:
         callback_data="toggle_evening"
     )
     
+    # Кнопка "Документы"
+    builder.button(
+        text="📑 Документы",
+        callback_data="open_docs"
+    )
+    
     builder.adjust(1) # Все кнопки в один столбец
     return builder
 

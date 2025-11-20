@@ -12,7 +12,7 @@ from aiogram.types import BotCommand
 from aiogram.fsm.storage.memory import MemoryStorage # Импортируем MemoryStorage
 from dotenv import load_dotenv
 
-from handlers import start, text_handler, premium_content, free_content, callbacks, settings, nameday, dukhovnik_handler, favorites, support_handler
+from handlers import start, text_handler, premium_content, free_content, callbacks, settings, nameday, dukhovnik_handler, favorites, support_handler, legal_handler
 from core.scheduler import scheduler, send_morning_notification, send_afternoon_notification, send_evening_notification # check_namedays
 from core.subscription_checker import check_access # Импортируем мидлварь проверки доступа
 from core.user_database import user_db, get_user # Импортируем user_db и get_user
@@ -45,7 +45,8 @@ async def set_main_menu(bot: Bot):
         BotCommand(command="/subscribe", description="🌟 Оформить Premium"),
         BotCommand(command="/settings", description="⚙️ Настройки"),
         BotCommand(command="/support", description="💬 поддержка / обратная связь"),
-        BotCommand(command="/terms", description="📄 Условия")
+        BotCommand(command="/terms", description="📄 Условия"),
+        BotCommand(command="/documents", description="📑 Документы")
     ]
     await bot.set_my_commands(main_menu_commands)
     print("INFO: Main menu commands set successfully.")
@@ -92,6 +93,7 @@ async def main() -> None:
     # dp.include_router(nameday.router) # Закомментировано: именины
     dp.include_router(callbacks.router) # Оставляем для общих колбэков, но закомментируем связанные с постом
     dp.include_router(support_handler.router) # Подключаем роутер для поддержки
+    dp.include_router(legal_handler.router) # Подключаем роутер для юридических документов
     dp.include_router(text_handler.router) # Этот роутер должен быть последним
 
     # Устанавливаем главное меню
