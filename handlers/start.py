@@ -1,6 +1,6 @@
 from aiogram import F, Router, Bot
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message, FSInputFile, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, FSInputFile, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.context import FSMContext # Импортируем FSMContext
 from core.content_sender import send_and_delete_previous, send_content_message # Импортируем новую централизованную функцию
@@ -17,6 +17,9 @@ async def command_start_handler(message: Message, bot: Bot, state: FSMContext) -
     Этот обработчик будет срабатывать на команду /start
     """
     chat_id = message.chat.id
+    
+    # Сначала убираем старую клавиатуру (сброс кэша Telegram)
+    await message.answer("♻️", reply_markup=ReplyKeyboardRemove())
     
     # 1. Отправка изображения с приветственной подписью
     welcome_caption = (
