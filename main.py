@@ -45,7 +45,6 @@ async def set_main_menu(bot: Bot):
         BotCommand(command="/subscribe", description="🌟 Оформить Premium"),
         BotCommand(command="/settings", description="⚙️ Настройки"),
         BotCommand(command="/support", description="💬 поддержка / обратная связь"),
-        BotCommand(command="/terms", description="📄 Условия"),
         BotCommand(command="/documents", description="📑 Документы")
     ]
     await bot.set_my_commands(main_menu_commands)
