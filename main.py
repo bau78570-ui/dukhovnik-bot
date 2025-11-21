@@ -36,7 +36,7 @@ async def set_main_menu(bot: Bot):
     """
     print("INFO: Setting main menu commands...")
     main_menu_commands = [
-        BotCommand(command="/start", description="перезапустить бота"),
+        BotCommand(command="/start", description="🔄 Перезапустить бота"),
         BotCommand(command="/dukhovnik", description="💬 Поговорить с Духовником"),
         BotCommand(command="/calendar", description="🗓️ Православный календарь"),
         BotCommand(command="/molitva", description="🙏 Молитва"),
@@ -44,7 +44,7 @@ async def set_main_menu(bot: Bot):
         BotCommand(command="/favorites", description="⭐️ Избранное"), # Добавляем команду для избранного
         BotCommand(command="/subscribe", description="🌟 Оформить Premium"),
         BotCommand(command="/settings", description="⚙️ Настройки"),
-        BotCommand(command="/support", description="💬 поддержка / обратная связь"),
+        BotCommand(command="/support", description="💬 Поддержка / Обратная связь"),
         BotCommand(command="/documents", description="📑 Документы")
     ]
     await bot.set_my_commands(main_menu_commands)
