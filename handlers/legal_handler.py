@@ -4,7 +4,6 @@ from aiogram.types import Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.context import FSMContext
 from core.content_sender import send_and_delete_previous
-import logging
 
 # Создаем роутер для юридических документов
 router = Router()
@@ -15,14 +14,9 @@ async def documents_handler(message: Message, bot: Bot, state: FSMContext):
     Обработчик для команды /documents.
     Отправляет сообщение с кнопками для доступа к юридическим документам.
     """
-    logging.info("documents_handler called - creating URL buttons")
+    text = "📑 **Юридическая информация**\n\nНажмите на кнопку, чтобы открыть документ."
     
-    text = (
-        "📑 **Юридическая информация**\n\n"
-        "Нажмите на кнопку, чтобы открыть документ."
-    )
-    
-    # Создаем инлайн-кнопки для документов
+    # Создаем инлайн-кнопки для документов (все кнопки типа url)
     builder = InlineKeyboardBuilder()
     builder.button(
         text="📄 Публичная оферта",
@@ -41,23 +35,17 @@ async def documents_handler(message: Message, bot: Bot, state: FSMContext):
         url="https://teletype.in/@doc_content/8-O2LHYxBaV"
     )
     builder.button(
-        text="📄Условия использования Бота",
+        text="📄 Условия использования Бота",
         url="https://teletype.in/@doc_content/IWP-06AxhyO"
     )
     builder.adjust(1)  # Все кнопки в один столбец
-    
-    markup = builder.as_markup()
-    logging.info(f"Created markup with {len(markup.inline_keyboard)} rows")
-    for i, row in enumerate(markup.inline_keyboard):
-        for j, button in enumerate(row):
-            logging.info(f"Button {i}-{j}: text='{button.text}', url='{button.url}'")
     
     await send_and_delete_previous(
         bot=bot,
         chat_id=message.chat.id,
         state=state,
         text=text,
-        reply_markup=markup,
+        reply_markup=builder.as_markup(),
         show_typing=False
     )
 
