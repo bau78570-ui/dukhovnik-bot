@@ -1,6 +1,6 @@
 from aiogram import Router, Bot, F
 from aiogram.filters import Command
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.context import FSMContext
 from core.content_sender import send_and_delete_previous
@@ -21,27 +21,26 @@ async def documents_handler(message: Message, bot: Bot, state: FSMContext):
     
     # Создаем инлайн-кнопки для документов
     builder = InlineKeyboardBuilder()
-    builder.button(
+    builder.row(InlineKeyboardButton(
         text="📄 Публичная оферта",
         url="https://teletype.in/@doc_content/6QpC1mnksmb"
-    )
-    builder.button(
+    ))
+    builder.row(InlineKeyboardButton(
         text="🔒 Политика конфиденциальности",
         url="https://teletype.in/@doc_content/Hh6yLo5tGOj"
-    )
-    builder.button(
+    ))
+    builder.row(InlineKeyboardButton(
         text="🔄 Правила подписки",
         url="https://teletype.in/@doc_content/sAIM1-NuMBl"
-    )
-    builder.button(
+    ))
+    builder.row(InlineKeyboardButton(
         text="👤 Реквизиты Исполнителя",
         url="https://teletype.in/@doc_content/8-O2LHYxBaV"
-    )
-    builder.button(
+    ))
+    builder.row(InlineKeyboardButton(
         text="📄Условия использования Бота",
         url="https://teletype.in/@doc_content/IWP-06AxhyO"
-    )
-    builder.adjust(1)  # Все кнопки в один столбец
+    ))
     
     await send_and_delete_previous(
         bot=bot,
@@ -65,27 +64,26 @@ async def open_docs_callback(callback: CallbackQuery, bot: Bot, state: FSMContex
     
     # Создаем инлайн-кнопки для документов
     builder = InlineKeyboardBuilder()
-    builder.button(
+    builder.row(InlineKeyboardButton(
         text="📄 Публичная оферта",
         url="https://teletype.in/@doc_content/6QpC1mnksmb"
-    )
-    builder.button(
+    ))
+    builder.row(InlineKeyboardButton(
         text="🔒 Политика конфиденциальности",
         url="https://teletype.in/@doc_content/Hh6yLo5tGOj"
-    )
-    builder.button(
+    ))
+    builder.row(InlineKeyboardButton(
         text="🔄 Правила подписки",
         url="https://teletype.in/@doc_content/sAIM1-NuMBl"
-    )
-    builder.button(
+    ))
+    builder.row(InlineKeyboardButton(
         text="👤 Реквизиты Исполнителя",
         url="https://teletype.in/@doc_content/8-O2LHYxBaV"
-    )
-    builder.button(
+    ))
+    builder.row(InlineKeyboardButton(
         text="📄Условия использования Бота",
         url="https://teletype.in/@doc_content/IWP-06AxhyO"
-    )
-    builder.adjust(1)  # Все кнопки в один столбец
+    ))
     
     # Отвечаем на колбэк
     await callback.answer()
