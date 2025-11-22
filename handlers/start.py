@@ -36,7 +36,7 @@ async def command_start_handler(message: Message, bot: Bot, state: FSMContext) -
     # 2. Отправка дисклеймера и кнопок
     builder = InlineKeyboardBuilder()
     builder.button(text="✅ Начать 3 дня бесплатно", callback_data="start_trial")
-    builder.button(text="📄 Условия использования", callback_data="show_terms")
+    builder.button(text="📄 Условия использования", url="https://teletype.in/@doc_content/IWP-06AxhyO")
     builder.adjust(2)
 
     disclaimer_text = (
