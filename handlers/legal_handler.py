@@ -35,7 +35,7 @@ async def documents_handler(message: Message, bot: Bot, state: FSMContext):
         url="https://teletype.in/@doc_content/8-O2LHYxBaV"
     )
     builder.button(
-        text="📄 Условия использования Бота",
+        text="📄 Условия использования",
         url="https://teletype.in/@doc_content/IWP-06AxhyO"
     )
     builder.adjust(1)  # Все кнопки в один столбец
