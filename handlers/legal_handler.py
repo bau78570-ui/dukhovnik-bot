@@ -25,11 +25,11 @@ async def documents_handler(message: Message, bot: Bot, state: FSMContext):
     # Создаем инлайн-кнопки для документов
     builder = InlineKeyboardBuilder()
     builder.button(text="📄 Публичная оферта", url="https://teletype.in/@doc_content/6QpC1mnksmb")
-        builder.button(text="🔒 Политика конфиденциальности", url="https://teletype.in/@doc_content/Hh6yLo5tGOj")
-        builder.button(text="🔄 Правила подписки", url="https://teletype.in/@doc_content/sAIM1-NuMBl")
-        builder.button(text="👤 Реквизиты Исполнителя", url="https://teletype.in/@doc_content/8-O2LHYxBaV")
-        builder.button(text="📄 Условия использования", url="https://teletype.in/@doc_content/IWP-06AxhyO")
-        builder.adjust(1)
+    builder.button(text="🔒 Политика конфиденциальности", url="https://teletype.in/@doc_content/Hh6yLo5tGOj")
+    builder.button(text="🔄 Правила подписки", url="https://teletype.in/@doc_content/sAIM1-NuMBl")
+    builder.button(text="👤 Реквизиты Исполнителя", url="https://teletype.in/@doc_content/8-O2LHYxBaV")
+    builder.button(text="📄 Условия использования", url="https://teletype.in/@doc_content/IWP-06AxhyO")
+    builder.adjust(1)
        
     markup = builder.as_markup()
     logging.info(f"Created markup with {len(markup.inline_keyboard)} rows")
@@ -76,7 +76,7 @@ async def open_docs_callback(callback: CallbackQuery, bot: Bot, state: FSMContex
         url="https://teletype.in/@doc_content/8-O2LHYxBaV"
     )
     builder.button(
-        text="📄Условия использования Бота",
+        text="📄 Условия использования",
         url="https://teletype.in/@doc_content/IWP-06AxhyO"
     )
     builder.adjust(1)  # Все кнопки в один столбец
