@@ -20,7 +20,7 @@ from core.user_database import user_db, get_all_users_with_namedays
 from core.content_sender import send_content_message
 from core.calendar_data import fetch_and_cache_calendar_data
 from core.ai_interaction import get_ai_response # Импортируем для AI-генерации
-from core.subscription_checker import is_subscription_active # Импортируем для проверки подписки
+from core.subscription_checker import is_premium # Импортируем для проверки премиум доступа
 
 async def get_calendar_theme_from_ical(ical_url: str) -> str | None:
     """
@@ -204,7 +204,7 @@ async def send_morning_notification(bot: Bot):
             logging.info(f"Checking access for user {user_id}...")
             admin_id_str = os.getenv("ADMIN_ID")
             logging.info(f"User ID: {user_id}, Admin ID from .env: {admin_id_str}")
-            has_access = await is_subscription_active(user_id) or (str(user_id) == admin_id_str)
+            has_access = await is_premium(user_id) or (str(user_id) == admin_id_str)
             logging.info(f"User has access: {has_access}")
             if has_access:
                 logging.info(f"Attempting to send notification to user {user_id}...")
@@ -337,7 +337,7 @@ async def _send_daily_word_notification(bot: Bot, notification_type: str, hour: 
         logging.info(f"{notification_type} notification enabled: {setting_enabled}")
         if setting_enabled:
             logging.info(f"Checking access for user {user_id}...")
-            has_access = await is_subscription_active(user_id) or (str(user_id) == admin_id_str)
+            has_access = await is_premium(user_id) or (str(user_id) == admin_id_str)
             logging.info(f"User has access: {has_access}")
             if has_access:
                 logging.info(f"Attempting to send {notification_type} notification to user {user_id}...")

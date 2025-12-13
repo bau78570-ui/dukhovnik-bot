@@ -38,9 +38,22 @@ async def activate_trial(user_id: int) -> bool:
 
 async def is_subscription_active(user_id: int) -> bool:
     """
-    Имитирует проверку активности платной подписки пользователя.
-    TODO: Заменить на реальную логику проверки в базе данных.
+    Проверяет активность платной подписки пользователя.
+    Проверяет наличие и валидность subscription_end_date в базе данных пользователя.
     """
+    user_data = get_user(user_id)
+    subscription_end = user_data.get('subscription_end_date')
+    if subscription_end:
+        # Если subscription_end_date - это datetime, проверяем, не истекла ли подписка
+        if isinstance(subscription_end, datetime):
+            return datetime.now() < subscription_end
+        # Если это строка, пытаемся распарсить
+        elif isinstance(subscription_end, str):
+            try:
+                end_date = datetime.fromisoformat(subscription_end)
+                return datetime.now() < end_date
+            except (ValueError, TypeError):
+                return False
     return False
 
 async def is_premium(user_id: int) -> bool:
