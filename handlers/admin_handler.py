@@ -4,7 +4,8 @@ from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
 from dotenv import load_dotenv
-from core.user_database import get_bot_stats
+from core.user_database import user_db
+from core.subscription_checker import is_subscription_active
 
 # Загружаем переменные окружения
 load_dotenv()
@@ -12,61 +13,78 @@ load_dotenv()
 # Создаем роутер для админ-панели
 router = Router()
 
+# Получаем ADMIN_ID из переменных окружения
+ADMIN_ID = os.getenv('ADMIN_ID')
+
 @router.message(Command("admin"))
-async def admin_handler(message: Message):
+async def admin_command_handler(message: Message):
     """
     Обработчик команды /admin.
-    Доступен только для администратора (ID из переменной окружения ADMIN_ID).
+    Доступен ТОЛЬКО для администратора (ID из переменной окружения ADMIN_ID).
     """
     user_id = message.from_user.id
-    admin_id_str = os.getenv('ADMIN_ID')
     
-    # Логируем для отладки
-    logging.info(f"Admin command received from user_id: {user_id}, ADMIN_ID from env: {admin_id_str}")
+    # Логируем попытку доступа
+    logging.info(f"=== ADMIN COMMAND ATTEMPT ===")
+    logging.info(f"User ID: {user_id}")
+    logging.info(f"ADMIN_ID from env: {ADMIN_ID}")
     
-    # Проверяем, является ли пользователь администратором
-    if not admin_id_str:
-        logging.warning("ADMIN_ID not set in environment variables!")
+    # Проверка 1: Проверяем, установлен ли ADMIN_ID
+    if not ADMIN_ID:
+        logging.error("ADMIN_ID not set in .env file!")
         await message.answer(
-            "❌ Ошибка: переменная ADMIN_ID не установлена в файле .env",
+            "❌ <b>Ошибка конфигурации</b>\n\n"
+            "Переменная ADMIN_ID не установлена в файле .env",
             parse_mode='HTML'
         )
         return
     
+    # Проверка 2: Проверяем формат ADMIN_ID
     try:
-        admin_id = int(admin_id_str)
+        admin_id = int(ADMIN_ID)
     except (ValueError, TypeError):
-        logging.error(f"ADMIN_ID is not a valid integer: {admin_id_str}")
+        logging.error(f"ADMIN_ID is not a valid integer: {ADMIN_ID}")
         await message.answer(
-            "❌ Ошибка: неверный формат ADMIN_ID в файле .env",
+            "❌ <b>Ошибка конфигурации</b>\n\n"
+            f"Неверный формат ADMIN_ID в файле .env: {ADMIN_ID}",
             parse_mode='HTML'
         )
         return
     
+    # Проверка 3: Проверяем, является ли пользователь администратором
     if user_id != admin_id:
-        logging.info(f"Access denied: user_id {user_id} != admin_id {admin_id}")
-        # Игнорируем команду от всех, кроме администратора
+        logging.warning(f"Access denied: user_id {user_id} != admin_id {admin_id}")
+        # Молча игнорируем команду от не-администраторов
         return
     
+    # Все проверки пройдены - пользователь является администратором
     logging.info(f"Admin access granted for user_id: {user_id}")
     
     try:
         # Получаем статистику
-        stats = await get_bot_stats()
+        # 1. Общее количество пользователей (все, кто хотя бы раз нажал /start)
+        total_users = len(user_db)
+        
+        # 2. Количество активных платных подписок
+        active_subscriptions = 0
+        for user_id_in_db in user_db.keys():
+            if await is_subscription_active(user_id_in_db):
+                active_subscriptions += 1
         
         # Формируем сообщение со статистикой
         stats_text = (
             f"📊 <b>Статистика Духовника</b>\n\n"
-            f"👥 Всего пользователей: {stats['total_users']}\n"
-            f"✅ Активных подписок: {stats['active_subscriptions']}"
+            f"👥 <b>Всего пользователей:</b> {total_users}\n"
+            f"✅ <b>Активных подписок:</b> {active_subscriptions}"
         )
         
         await message.answer(stats_text, parse_mode='HTML')
-        logging.info("Admin stats sent successfully")
+        logging.info(f"Admin stats sent: total_users={total_users}, active_subscriptions={active_subscriptions}")
+        
     except Exception as e:
         logging.error(f"Error getting bot stats: {e}", exc_info=True)
         await message.answer(
-            f"❌ Ошибка при получении статистики: {str(e)}",
+            f"❌ <b>Ошибка при получении статистики</b>\n\n"
+            f"Детали: {str(e)}",
             parse_mode='HTML'
         )
-

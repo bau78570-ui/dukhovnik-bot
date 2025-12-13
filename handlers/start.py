@@ -16,6 +16,10 @@ async def command_start_handler(message: Message, bot: Bot, state: FSMContext) -
     """
     Этот обработчик будет срабатывать на команду /start
     """
+    # Регистрируем пользователя в базе данных
+    user_id = message.from_user.id
+    get_user(user_id)  # Создает запись пользователя, если его еще нет
+    
     chat_id = message.chat.id
     
     # Сначала убираем старую клавиатуру (сброс кэша Telegram)

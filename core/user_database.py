@@ -94,24 +94,3 @@ def get_all_users_with_namedays() -> dict[int, list[str]]:
         if user_data.get('nameday_persons'):
             users_with_namedays[user_id] = user_data['nameday_persons']
     return users_with_namedays
-
-async def get_bot_stats() -> dict:
-    """
-    Возвращает статистику бота:
-    - Количество всех пользователей в БД
-    - Количество пользователей с активной подпиской (Premium)
-    """
-    from core.subscription_checker import is_premium
-    
-    total_users = len(user_db)
-    active_subscriptions = 0
-    
-    # Подсчитываем пользователей с активной подпиской
-    for user_id in user_db.keys():
-        if await is_premium(user_id):
-            active_subscriptions += 1
-    
-    return {
-        'total_users': total_users,
-        'active_subscriptions': active_subscriptions
-    }
