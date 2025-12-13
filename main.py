@@ -19,7 +19,14 @@ from core.user_database import user_db, get_user # Импортируем user_d
 # from core.calendar_data import cached_calendar_data # Импортируем кэш календаря
 
 # Настройка логирования
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('bot.log', encoding='utf-8'),
+        logging.StreamHandler()  # Также выводим в консоль
+    ]
+)
 
 # Загрузка переменных окружения из файла .env
 load_dotenv()
