@@ -37,6 +37,9 @@ async def handle_text_message(message: Message, bot: Bot, state: FSMContext):
         if text.startswith('/'):
             # Извлекаем имя команды (до пробела или @)
             command_name = text.split()[0].split('@')[0] if ' ' in text or '@' in text else text
+            # Явно пропускаем команду /admin
+            if command_name == '/admin':
+                logging.warning(f"Text handler: BLOCKING /admin command - this should not happen!")
             logging.info(f"Text handler: skipping command {command_name}")
             return
     

@@ -1,33 +1,32 @@
 import os
 import logging
-from aiogram import Router
+from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.types import Message
-from dotenv import load_dotenv
 from core.user_database import user_db
 from core.subscription_checker import is_subscription_active
-
-# Загружаем переменные окружения
-load_dotenv()
 
 # Создаем роутер для админ-панели
 router = Router()
 
-# Получаем ADMIN_ID из переменных окружения
-ADMIN_ID = os.getenv('ADMIN_ID')
+def get_admin_id():
+    """Получает ADMIN_ID из переменных окружения (загружает каждый раз)"""
+    return os.getenv('ADMIN_ID')
 
-@router.message(Command("admin"))
+@router.message(Command("admin") | (F.text == "/admin"))
 async def admin_command_handler(message: Message):
     """
     Обработчик команды /admin.
     Доступен ТОЛЬКО для администратора (ID из переменной окружения ADMIN_ID).
     """
     user_id = message.from_user.id
+    ADMIN_ID = get_admin_id()
     
     # Логируем попытку доступа
     logging.info(f"=== ADMIN COMMAND ATTEMPT ===")
     logging.info(f"User ID: {user_id}")
     logging.info(f"ADMIN_ID from env: {ADMIN_ID}")
+    logging.info(f"Message text: {message.text}")
     
     # Проверка 1: Проверяем, установлен ли ADMIN_ID
     if not ADMIN_ID:
