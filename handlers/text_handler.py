@@ -1,5 +1,4 @@
 from aiogram import Router, F, Bot
-from aiogram.filters import Command
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from aiogram.fsm.context import FSMContext # Импортируем FSMContext
 from core.ai_interaction import get_ai_response
@@ -24,13 +23,23 @@ def get_favorite_keyboard(message_id: int, is_favorited: bool = False) -> Inline
         [InlineKeyboardButton(text=text, callback_data=callback_data)]
     ])
 
-@router.message(F.text & ~Command())
+@router.message(F.text)
 async def handle_text_message(message: Message, bot: Bot, state: FSMContext):
     """
     Этот обработчик будет срабатывать на любое текстовое сообщение, кроме команд.
     Он проверяет, не находится ли пользователь в режиме составления молитвы,
     и в зависимости от этого либо генерирует молитву, либо отвечает как обычно.
     """
+    # Пропускаем команды - они должны обрабатываться другими обработчиками
+    # Проверяем как обычные команды, так и команды с параметрами
+    if message.text:
+        text = message.text.strip()
+        if text.startswith('/'):
+            # Извлекаем имя команды (до пробела или @)
+            command_name = text.split()[0].split('@')[0] if ' ' in text or '@' in text else text
+            logging.info(f"Text handler: skipping command {command_name}")
+            return
+    
     user_id = message.from_user.id
     chat_id = message.chat.id
     
