@@ -1,4 +1,5 @@
 from aiogram import Router, F, Bot
+from aiogram.filters import Command
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from aiogram.fsm.context import FSMContext # Импортируем FSMContext
 from core.ai_interaction import get_ai_response
@@ -23,10 +24,10 @@ def get_favorite_keyboard(message_id: int, is_favorited: bool = False) -> Inline
         [InlineKeyboardButton(text=text, callback_data=callback_data)]
     ])
 
-@router.message(F.text)
+@router.message(F.text & ~Command())
 async def handle_text_message(message: Message, bot: Bot, state: FSMContext):
     """
-    Этот обработчик будет срабатывать на любое текстовое сообщение.
+    Этот обработчик будет срабатывать на любое текстовое сообщение, кроме команд.
     Он проверяет, не находится ли пользователь в режиме составления молитвы,
     и в зависимости от этого либо генерирует молитву, либо отвечает как обычно.
     """
