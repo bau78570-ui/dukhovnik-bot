@@ -3,8 +3,9 @@ from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, FSInputFile, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.context import FSMContext # Импортируем FSMContext
+from datetime import datetime # Импортируем datetime
 from core.content_sender import send_and_delete_previous, send_content_message # Импортируем новую централизованную функцию
-from core.user_database import get_user # Импортируем get_user
+from core.user_database import get_user, user_db # Импортируем get_user и user_db
 from core.subscription_checker import is_premium # Импортируем is_premium
 import logging # Импортируем logging
 
@@ -18,7 +19,20 @@ async def command_start_handler(message: Message, bot: Bot, state: FSMContext) -
     """
     # Регистрируем пользователя в базе данных
     user_id = message.from_user.id
-    get_user(user_id)  # Создает запись пользователя, если его еще нет
+    
+    # Если пользователя нет в базе, создаем запись с пробным периодом
+    if user_id not in user_db:
+        user_db[user_id] = {
+            'subscription_status': 'free',
+            'trial_start_date': datetime.now(),
+            'notifications': {'morning': True, 'daily': True, 'evening': True},
+            'prayer_mode_topic': None,
+            'nameday_persons': [],
+            'favorites': []
+        }
+        logging.info(f"Новый пользователь добавлен: {user_id}")
+    else:
+        get_user(user_id)  # Создает запись пользователя, если его еще нет
     
     chat_id = message.chat.id
     

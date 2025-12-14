@@ -64,6 +64,16 @@ async def admin_command_handler(message: Message):
         # 1. Общее количество пользователей (все, кто хотя бы раз нажал /start)
         total_users = len(user_db)
         
+        # Проверяем, пуста ли база пользователей
+        if total_users == 0:
+            await message.answer(
+                "📊 <b>Статистика Духовника</b>\n\n"
+                "⚠️ База пользователей пуста. Проверьте /start",
+                parse_mode='HTML'
+            )
+            logging.info("Admin stats: user_db is empty")
+            return
+        
         # 2. Количество активных платных подписок
         active_subscriptions = 0
         for user_id_in_db in user_db.keys():
