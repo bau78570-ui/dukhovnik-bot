@@ -53,7 +53,7 @@ async def admin_command_handler(message: Message):
     # Проверка 3: Проверяем, является ли пользователь администратором
     if user_id != admin_id:
         logging.warning(f"Access denied: user_id {user_id} != admin_id {admin_id}")
-        # Молча игнорируем команду от не-администраторов
+        await message.answer("Доступ запрещён", parse_mode='HTML')
         return
     
     # Все проверки пройдены - пользователь является администратором

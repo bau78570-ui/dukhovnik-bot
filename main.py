@@ -12,7 +12,8 @@ from aiogram.types import BotCommand
 from aiogram.fsm.storage.memory import MemoryStorage # Импортируем MemoryStorage
 from dotenv import load_dotenv
 
-from handlers import start, text_handler, premium_content, free_content, callbacks, settings, nameday, dukhovnik_handler, favorites, support_handler, legal_handler, admin_handler
+from handlers import start, text_handler, premium_content, free_content, callbacks, settings, nameday, dukhovnik_handler, favorites, support_handler, legal_handler
+from handlers.admin_handler import router as admin_router
 from core.scheduler import scheduler, send_morning_notification, send_afternoon_notification, send_evening_notification # check_namedays
 from core.subscription_checker import check_access # Импортируем мидлварь проверки доступа
 from core.user_database import user_db, get_user # Импортируем user_db и get_user
@@ -92,7 +93,7 @@ async def main() -> None:
     # Подключаем роутеры из handlers
     dp.include_router(start.router)
     dp.include_router(settings.router)
-    dp.include_router(admin_handler.router) # Подключаем роутер для админ-панели
+    dp.include_router(admin_router) # Подключаем роутер для админ-панели
     dp.include_router(premium_content.router) # Оставляем для /daily_word и /molitva
     dp.include_router(free_content.router) # Раскомментировано для /menu и других бесплатных команд
     dp.include_router(dukhovnik_handler.router) # Подключаем новый роутер для /dukhovnik
