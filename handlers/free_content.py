@@ -10,6 +10,8 @@ from aiogram.enums import ChatAction
 from aiogram.fsm.context import FSMContext # Импортируем FSMContext
 from core.content_sender import send_and_delete_previous, send_content_message # Импортируем новую централизованную функцию
 from core.calendar_data import get_calendar_data, fetch_and_cache_calendar_data
+from core.user_database import get_user # Импортируем get_user
+from core.subscription_checker import activate_trial # Импортируем activate_trial
 
 # Устанавливаем русскую локаль для корректного отображения месяца
 try:
@@ -173,8 +175,13 @@ async def molitva_handler(message: Message, bot: Bot, state: FSMContext):
 async def subscribe_handler(message: Message, bot: Bot, state: FSMContext):
     """
     Обработчик для команды /subscribe.
-    Отправляет предложение о подписке.
+    Отправляет предложение о подписке и активирует бесплатный период, если он еще не активирован.
     """
+    user_id = message.from_user.id
+    
+    # Активируем бесплатный период, если он еще не был активирован
+    await activate_trial(user_id)
+    
     # Создаем инлайн-кнопку с ссылкой на оплату
     builder = InlineKeyboardBuilder()
     builder.button(

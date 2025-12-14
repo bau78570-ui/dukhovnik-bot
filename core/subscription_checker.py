@@ -1,4 +1,5 @@
 import os
+import logging
 from dotenv import load_dotenv
 from typing import Callable, Dict, Any, Awaitable
 from aiogram import BaseMiddleware
@@ -33,6 +34,7 @@ async def activate_trial(user_id: int) -> bool:
         return await is_trial_active(user_id)
     
     user_data['trial_start_date'] = datetime.now()
+    user_data['status'] = 'free'
     # TODO: Сохранить user_db в постоянное хранилище
     return True
 
@@ -40,8 +42,29 @@ async def is_subscription_active(user_id: int) -> bool:
     """
     Проверяет активность платной подписки пользователя.
     Проверяет наличие и валидность subscription_end_date в базе данных пользователя.
+    Также проверяет пробный период: если trial_start_date + 3 days < datetime.now() и status == 'free' → возвращает False.
     """
     user_data = get_user(user_id)
+    
+    # Проверка пробного периода: если истёк и status == 'free', отключаем доступ
+    trial_start_date = user_data.get('trial_start_date')
+    status = user_data.get('status')
+    
+    if trial_start_date and status == 'free':
+        if isinstance(trial_start_date, str):
+            try:
+                trial_start_date = datetime.fromisoformat(trial_start_date)
+            except (ValueError, TypeError):
+                pass
+        
+        if isinstance(trial_start_date, datetime):
+            trial_end_date = trial_start_date + timedelta(days=TRIAL_DURATION_DAYS)
+            if datetime.now() >= trial_end_date:
+                # Пробный период истёк
+                user_data['status'] = 'expired'
+                logging.info(f"Пробный период истёк для user_id {user_id}")
+                return False
+    
     subscription_end = user_data.get('subscription_end_date')
     if subscription_end:
         # Если subscription_end_date - это datetime, проверяем, не истекла ли подписка
