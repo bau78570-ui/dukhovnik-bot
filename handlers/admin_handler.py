@@ -13,7 +13,7 @@ def get_admin_id():
     """Получает ADMIN_ID из переменных окружения (загружает каждый раз)"""
     return os.getenv('ADMIN_ID')
 
-@router.message(Command("admin") | (F.text == "/admin"))
+@router.message(Command("admin"), F.chat.type == "private")
 async def admin_command_handler(message: Message):
     """
     Обработчик команды /admin.
