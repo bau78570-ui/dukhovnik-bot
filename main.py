@@ -90,21 +90,18 @@ async def main() -> None:
     dp.message.middleware(check_access)
     dp.callback_query.middleware(check_access)
 
-    # Подключаем роутеры из handlers
+    # Подключаем роутеры из handlers постом
     dp.include_router(start.router)
     dp.include_router(settings.router)
-    dp.include_router(admin_router) # Подключаем роутер для админ-панели
-    dp.include_router(premium_content.router) # Оставляем для /daily_word и /molitva
-    dp.include_router(free_content.router) # Раскомментировано для /menu и других бесплатных команд
-    dp.include_router(dukhovnik_handler.router) # Подключаем новый роутер для /dukhovnik
-    dp.include_router(favorites.router) # Подключаем роутер для избранного
-    # dp.include_router(nameday.router) # Закомментировано: именины
-    dp.include_router(callbacks.router) # Оставляем для общих колбэков, но закомментируем связанные с постом
-    dp.include_router(support_handler.router) # Подключаем роутер для поддержки
-    dp.include_router(legal_handler.router) # Подключаем роутер для юридических документов
-    dp.include_router(text_handler.router) # Этот роутер должен быть последним
-    from handlers.admin import router as admin_router
-dp.include_router(admin_router)
+    dp.include_router(admin_router)  # админ выше всех
+    dp.include_router(premium_content.router)
+    dp.include_router(free_content.router)
+    dp.include_router(dukhovnik_handler.router)
+    dp.include_router(favorites.router)
+    dp.include_router(callbacks.router)
+    dp.include_router(support_handler.router)
+    dp.include_router(legal_handler.router)
+    dp.include_router(text_handler.router)  # всегда последним!
 
     # Устанавливаем главное меню
     await set_main_menu(bot)
