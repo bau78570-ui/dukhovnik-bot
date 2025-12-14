@@ -103,6 +103,8 @@ async def main() -> None:
     dp.include_router(support_handler.router) # Подключаем роутер для поддержки
     dp.include_router(legal_handler.router) # Подключаем роутер для юридических документов
     dp.include_router(text_handler.router) # Этот роутер должен быть последним
+    from handlers.admin import router as admin_router
+dp.include_router(admin_router)
 
     # Устанавливаем главное меню
     await set_main_menu(bot)
