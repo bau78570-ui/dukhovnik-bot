@@ -194,20 +194,14 @@ async def send_morning_notification(bot: Bot):
 
 
     # Рассылка уведомлений
-    for user_id, user_data in user_db.items():
-        logging.info(f"\n--- Processing User {user_id} ---")
-
-        logging.info(f"Checking morning notification setting for user {user_id}...")
-        setting_enabled = user_data.get('notifications', {}).get('morning', False)
-        logging.info(f"Morning notification enabled: {setting_enabled}")
-        if setting_enabled:
-            logging.info(f"Checking access for user {user_id}...")
-            admin_id_str = os.getenv("ADMIN_ID")
-            logging.info(f"User ID: {user_id}, Admin ID from .env: {admin_id_str}")
-            has_access = await is_premium(user_id) or (str(user_id) == admin_id_str)
-            logging.info(f"User has access: {has_access}")
-            if has_access:
-                logging.info(f"Attempting to send notification to user {user_id}...")
+    user_ids = list(user_db.keys())
+    for user_id in user_ids:
+        user_data = user_db[user_id]
+        status = user_data.get('status', 'free')
+        
+        if status in ['free', 'active']:
+            setting_enabled = user_data.get('notifications', {}).get('morning', False)
+            if setting_enabled:
                 try:
                     daily_word_images_path = 'assets/images/daily_word/'
                     fallback_image_path = 'assets/images/logo.png'
@@ -227,13 +221,9 @@ async def send_morning_notification(bot: Bot):
                     photo_file = FSInputFile(image_to_send)
                     await bot.send_photo(user_id, photo=photo_file, caption=caption, parse_mode='HTML')
 
-                    logging.info(f"Notification sent successfully to user {user_id}.")
+                    logging.info(f"Уведомление отправлено {user_id}: {status}")
                 except Exception as e:
                     logging.error(f"ERROR sending notification to user {user_id}: {e}")
-            else:
-                logging.info(f"User {user_id} does not have access to morning notifications (not Premium/Admin).")
-        else:
-            logging.info(f"Morning notifications are disabled for user {user_id}.")
 
 async def _send_daily_word_notification(bot: Bot, notification_type: str, hour: int, minute: int):
     """
@@ -329,28 +319,20 @@ async def _send_daily_word_notification(bot: Bot, notification_type: str, hour: 
         logging.error(f"ERROR: Ошибка при выборе изображения для {notification_type} рассылки: {e}. Используется запасное.")
 
     # Рассылка уведомлений
-    for user_id, user_data in user_db.items():
-        logging.info(f"\n--- Processing User {user_id} for {notification_type} notification ---")
-
-        logging.info(f"Checking {notification_type} notification setting for user {user_id}...")
-        setting_enabled = user_data.get('notifications', {}).get(notification_type, False)
-        logging.info(f"{notification_type} notification enabled: {setting_enabled}")
-        if setting_enabled:
-            logging.info(f"Checking access for user {user_id}...")
-            has_access = await is_premium(user_id) or (str(user_id) == admin_id_str)
-            logging.info(f"User has access: {has_access}")
-            if has_access:
-                logging.info(f"Attempting to send {notification_type} notification to user {user_id}...")
+    user_ids = list(user_db.keys())
+    for user_id in user_ids:
+        user_data = user_db[user_id]
+        status = user_data.get('status', 'free')
+        
+        if status in ['free', 'active']:
+            setting_enabled = user_data.get('notifications', {}).get(notification_type, False)
+            if setting_enabled:
                 try:
                     photo_file = FSInputFile(image_to_send)
                     await bot.send_photo(user_id, photo=photo_file, caption=caption, parse_mode='HTML')
-                    logging.info(f"{notification_type} notification sent successfully to user {user_id}.")
+                    logging.info(f"Уведомление отправлено {user_id}: {status}")
                 except Exception as e:
                     logging.error(f"ERROR sending {notification_type} notification to user {user_id}: {e}")
-            else:
-                logging.info(f"User {user_id} does not have access to {notification_type} notifications (not Premium/Admin).")
-        else:
-            logging.info(f"{notification_type} notifications are disabled for user {user_id}.")
 
 async def send_morning_notification(bot: Bot):
     """
