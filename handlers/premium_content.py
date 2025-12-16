@@ -132,7 +132,15 @@ async def get_daily_word_callback_handler(callback: CallbackQuery, bot: Bot, sta
         
         # Обрезаем ai_reflection, если нужно (оставляем запас, так как HTML может добавить длину)
         if len(ai_reflection) > available_length - 50:
-            ai_reflection = ai_reflection[:available_length - 50].rsplit(' ', 1)[0] + "..."
+            # Учитываем длину суффикса "..." (3 символа) при обрезке
+            max_reflection_length = available_length - 50 - 3
+            truncated = ai_reflection[:max_reflection_length]
+            # Пытаемся обрезать по последнему пробелу, если он есть
+            if ' ' in truncated:
+                ai_reflection = truncated.rsplit(' ', 1)[0] + "..."
+            else:
+                # Если пробелов нет, обрезаем напрямую и добавляем "..."
+                ai_reflection = truncated + "..."
             ai_reflection_html = convert_markdown_to_html(ai_reflection)
         
         # Формируем финальный текст
