@@ -21,6 +21,7 @@ from core.content_sender import send_content_message
 from core.calendar_data import fetch_and_cache_calendar_data
 from core.ai_interaction import get_ai_response # Импортируем для AI-генерации
 from core.subscription_checker import is_premium # Импортируем для проверки премиум доступа
+from utils.html_parser import convert_markdown_to_html # Импортируем для преобразования markdown в HTML
 
 async def get_calendar_theme_from_ical(ical_url: str) -> str | None:
     """
@@ -160,6 +161,9 @@ async def send_morning_notification(bot: Bot):
     except Exception as e:
         logging.error(f"ERROR: Ошибка при генерации AI-размышления в send_morning_notification: {e}. Используем базовое.")
 
+    # Преобразуем markdown в HTML для ai_reflection
+    ai_reflection_html = convert_markdown_to_html(ai_reflection)
+
     # Формирование caption
     today_formatted = datetime.now().strftime('%d.%m.%Y')
     
@@ -172,7 +176,7 @@ async def send_morning_notification(bot: Bot):
     caption = (
         f"✨ <b>{today_formatted} - {theme}</b> ✨\n\n"
         f"📖 <b>{display_scripture}</b>\n\n"
-        f"{ai_reflection}\n\n"
+        f"{ai_reflection_html}\n\n"
         f"#Православие #СловоДня #Размышление"
     )
 
@@ -290,12 +294,15 @@ async def _send_daily_word_notification(bot: Bot, notification_type: str, hour: 
     except Exception as e:
         logging.error(f"ERROR: Ошибка при генерации AI-размышления в {notification_type} рассылке: {e}. Используем базовое.")
 
+    # Преобразуем markdown в HTML для ai_reflection
+    ai_reflection_html = convert_markdown_to_html(ai_reflection)
+
     # Формирование caption
     today_formatted = datetime.now().strftime('%d.%m.%Y')
     caption = (
         f"✨ <b>{today_formatted} - {theme}</b> ✨\n\n"
         f"📖 <b>{scripture}</b>\n\n"
-        f"{ai_reflection}\n\n"
+        f"{ai_reflection_html}\n\n"
         f"#Православие #СловоДня #Размышление"
     )
 

@@ -12,6 +12,7 @@ from core.content_sender import send_and_delete_previous, send_content_message #
 from core.subscription_checker import check_access
 from core.content_library import daily_words # Импортируем daily_words
 from core.ai_interaction import get_ai_response # Импортируем функцию для AI-генерации
+from utils.html_parser import convert_markdown_to_html # Импортируем для преобразования markdown в HTML
 # from handlers.callbacks import prayer_topic_handler # Этот импорт больше не нужен, так как мы не вызываем хендлер напрямую
 
 # Создаем роутер для премиум-обработчиков
@@ -106,6 +107,9 @@ async def get_daily_word_callback_handler(callback: CallbackQuery, bot: Bot, sta
             return
         logging.info("Получен AI-ответ для Слова Дня.")
 
+        # Преобразуем markdown в HTML для ai_reflection
+        ai_reflection_html = convert_markdown_to_html(ai_reflection)
+
         # Обрезаем scripture, если он слишком длинный
         max_scripture_len = 200
         display_scripture = scripture
@@ -116,7 +120,7 @@ async def get_daily_word_callback_handler(callback: CallbackQuery, bot: Bot, sta
         final_text = (
             f"📖 <b>Слово Дня</b>\n\n"
             f"<b>{display_scripture}</b>\n\n"
-            f"{ai_reflection}"
+            f"{ai_reflection_html}"
         )
 
         # Выбираем случайное изображение из assets/images/daily_word/
