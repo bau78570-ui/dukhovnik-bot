@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import random
 import os
+import re
 from aiogram import Router, Bot, F
 from aiogram.filters import Command
 from aiogram.types import Message, InlineKeyboardButton, CallbackQuery, InputMediaPhoto
@@ -86,8 +87,8 @@ async def get_daily_word_callback_handler(callback: CallbackQuery, bot: Bot, sta
         # Выбираем случайный элемент из daily_words
         selected_word = random.choice(daily_words)
         scripture = selected_word['scripture']
-        base_reflection = selected_word['base_reflection']
-        logging.info(f"Выбрано Слово Дня: {scripture}")
+        source = selected_word['source']
+        logging.info(f"Слово Дня: {scripture} — {source}")
 
         # Формируем промт для AI
         prompt = (
@@ -116,12 +117,26 @@ async def get_daily_word_callback_handler(callback: CallbackQuery, bot: Bot, sta
         if len(scripture) > max_scripture_len:
             display_scripture = scripture[:max_scripture_len].rsplit(' ', 1)[0] + "..." # Обрезаем по слову
 
-        # Подготавливаем финальный текст
-        final_text = (
+        # Подготавливаем финальный текст с источником
+        source_text = f"\n\nИсточник: {source}"
+        final_text_without_ai = (
             f"📖 <b>Слово Дня</b>\n\n"
             f"<b>{display_scripture}</b>\n\n"
-            f"{ai_reflection_html}"
         )
+        
+        # Проверяем общую длину текста (без HTML-тегов) и обрезаем ai_reflection при необходимости
+        max_total_length = 350
+        # Оцениваем длину текста без HTML-тегов для проверки ограничения
+        text_without_html_length = len(re.sub(r'<[^>]+>', '', final_text_without_ai + source_text))
+        available_length = max_total_length - text_without_html_length
+        
+        # Обрезаем ai_reflection, если нужно (оставляем запас, так как HTML может добавить длину)
+        if len(ai_reflection) > available_length - 50:
+            ai_reflection = ai_reflection[:available_length - 50].rsplit(' ', 1)[0] + "..."
+            ai_reflection_html = convert_markdown_to_html(ai_reflection)
+        
+        # Формируем финальный текст
+        final_text = final_text_without_ai + ai_reflection_html + source_text
 
         # Выбираем случайное изображение из assets/images/daily_word/
         image_dir = 'daily_word' # Относительный путь внутри assets/images/
