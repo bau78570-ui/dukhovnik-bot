@@ -9,13 +9,46 @@ def convert_markdown_to_html(text: str) -> str:
     - Жирный текст: **текст** -> <b>текст</b>
     - Курсив: _текст_ -> <i>текст</i>
     - Переносы строк: \n (обрабатываются Telegram API в режиме HTML)
+    
+    Также экранирует HTML-символы в тексте для безопасной отправки в Telegram.
     """
+    if not text:
+        return text
+    
+    # Защищаем уже существующие HTML-теги от обработки
+    html_tag_placeholder_prefix = "___HTML_TAG_"
+    html_tag_placeholder_suffix = "___"
+    html_tags = []
+    tag_pattern = r'<[^>]+>'
+    
+    def save_tag(match):
+        tag = match.group(0)
+        html_tags.append(tag)
+        return f"{html_tag_placeholder_prefix}{len(html_tags) - 1}{html_tag_placeholder_suffix}"
+    
+    # Сохраняем существующие HTML-теги
+    text = re.sub(tag_pattern, save_tag, text)
+    
+    # Экранируем специальные символы HTML (но не в тегах, которые мы уже сохранили)
+    text = text.replace('&', '&amp;')
+    text = text.replace('<', '&lt;')
+    text = text.replace('>', '&gt;')
+    
+    # Восстанавливаем сохраненные HTML-теги
+    for i, tag in enumerate(html_tags):
+        text = text.replace(f"{html_tag_placeholder_prefix}{i}{html_tag_placeholder_suffix}", tag)
+    
+    # Теперь обрабатываем markdown форматирование
     # Жирный текст: **текст** -> <b>текст</b>
-    # Используем паттерн с отрицательным опережающим просмотром для корректной обработки
-    # любых символов, включая кавычки. Паттерн гарантирует, что между ** нет других **
-    text = re.sub(r'\*\*((?:(?!\*\*).)+?)\*\*', r'<b>\1</b>', text, flags=re.DOTALL)
+    # Обрабатываем все вхождения **text** даже если они содержат кавычки и другие символы
+    # Используем более надежный паттерн, который обрабатывает любые символы между **
+    # Паттерн ищет **, затем любые символы (включая переносы строк), затем **
+    text = re.sub(r'\*\*((?:[^*]|\*(?!\*))+?)\*\*', r'<b>\1</b>', text, flags=re.DOTALL)
+    
     # Курсив: _текст_ -> <i>текст</i>
-    text = re.sub(r'_(.*?)_', r'<i>\1</i>', text)
+    # Убеждаемся, что _ не является частью другого форматирования
+    text = re.sub(r'(?<!\*)_([^_]+)_(?!\*)', r'<i>\1</i>', text)
+    
     # Переносы строк обрабатываются Telegram API в режиме HTML
     return text
 
