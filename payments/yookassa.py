@@ -63,7 +63,9 @@ async def create_premium_payment(user_id: int, description: str = "Premium по�
         }
         
         logger.info(f"Отправка запроса на создание платежа в ЮKassa (тестовый режим: {YOOKASSA_TEST})")
-        payment = Payment.create(payment_data, idempotency_key=f"premium_{user_id}_{int(datetime.now().timestamp())}")
+        # Используем детерминированный idempotency_key для предотвращения дублирования платежей
+        # При повторных вызовах с тем же ключом ЮKassa вернет существующий платеж
+        payment = Payment.create(payment_data, idempotency_key=f"premium_{user_id}_subscription")
         
         payment_id = payment.id
         confirmation_url = payment.confirmation.confirmation_url
