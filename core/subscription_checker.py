@@ -38,6 +38,52 @@ async def activate_trial(user_id: int) -> bool:
     # TODO: Сохранить user_db в постоянное хранилище
     return True
 
+async def activate_premium_subscription(user_id: int, duration_days: int = 30) -> bool:
+    """
+    Активирует Premium подписку для пользователя на указанное количество дней.
+    
+    Args:
+        user_id: ID пользователя
+        duration_days: Количество дней подписки (по умолчанию 30)
+        
+    Returns:
+        bool: True если подписка активирована успешно
+    """
+    logging.info(f"Активация Premium подписки для user_id={user_id}, duration_days={duration_days}")
+    
+    try:
+        user_data = get_user(user_id)
+        subscription_end_date = datetime.now() + timedelta(days=duration_days)
+        
+        # Если подписка уже активна, продлеваем её от текущей даты окончания
+        current_end = user_data.get('subscription_end_date')
+        if current_end:
+            if isinstance(current_end, datetime):
+                if current_end > datetime.now():
+                    # Подписка еще активна, продлеваем от даты окончания
+                    subscription_end_date = current_end + timedelta(days=duration_days)
+                    logging.info(f"Продление активной подписки для user_id={user_id}, новый срок до {subscription_end_date}")
+                else:
+                    # Подписка истекла, начинаем новую от текущей даты
+                    logging.info(f"Начало новой подписки для user_id={user_id}, срок до {subscription_end_date}")
+            elif isinstance(current_end, str):
+                try:
+                    current_end_dt = datetime.fromisoformat(current_end)
+                    if current_end_dt > datetime.now():
+                        subscription_end_date = current_end_dt + timedelta(days=duration_days)
+                        logging.info(f"Продление активной подписки (из строки) для user_id={user_id}, новый срок до {subscription_end_date}")
+                except (ValueError, TypeError):
+                    logging.info(f"Начало новой подписки для user_id={user_id}, срок до {subscription_end_date}")
+        
+        user_data['subscription_end_date'] = subscription_end_date
+        user_data['status'] = 'premium'
+        logging.info(f"Premium подписка успешно активирована для user_id={user_id}, срок действия до {subscription_end_date}")
+        return True
+        
+    except Exception as e:
+        logging.error(f"Ошибка при активации Premium подписки для user_id={user_id}: {e}", exc_info=True)
+        return False
+
 async def is_subscription_active(user_id: int) -> bool:
     """
     Проверяет активность платной подписки пользователя.
