@@ -13,6 +13,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 from aiogram import Bot
 from aiogram.types import FSInputFile # Добавляем импорт FSInputFile
+from aiogram.enums import ParseMode
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from core.content_library import daily_quotes, fasting_content, reading_plans, daily_words # Добавляем daily_words
@@ -223,7 +224,7 @@ async def send_morning_notification(bot: Bot):
                         logging.warning(f"Папка {daily_word_images_path} не найдена или пуста. Используется {fallback_image_path}.")
                     
                     photo_file = FSInputFile(image_to_send)
-                    await bot.send_photo(user_id, photo=photo_file, caption=caption, parse_mode='HTML')
+                    await bot.send_photo(user_id, photo=photo_file, caption=caption, parse_mode=ParseMode.HTML)
 
                     logging.info(f"Уведомление отправлено {user_id}: {status}")
                 except Exception as e:
@@ -336,7 +337,7 @@ async def _send_daily_word_notification(bot: Bot, notification_type: str, hour: 
             if setting_enabled:
                 try:
                     photo_file = FSInputFile(image_to_send)
-                    await bot.send_photo(user_id, photo=photo_file, caption=caption, parse_mode='HTML')
+                    await bot.send_photo(user_id, photo=photo_file, caption=caption, parse_mode=ParseMode.HTML)
                     logging.info(f"Уведомление отправлено {user_id}: {status}")
                 except Exception as e:
                     logging.error(f"ERROR sending {notification_type} notification to user {user_id}: {e}")
@@ -387,7 +388,7 @@ async def check_namedays(bot: Bot):
                     "Не забудьте поздравить!"
                 )
                 try:
-                    await bot.send_message(user_id, notification_text, parse_mode='HTML')
+                    await bot.send_message(user_id, notification_text, parse_mode=ParseMode.HTML)
                     logging.info(f"Отправлено уведомление об именинах пользователю {user_id} для {person_name}")
                 except Exception as e:
                     logging.error(f"Не удалось отправить уведомление об именинах пользователю {user_id}: {e}")
