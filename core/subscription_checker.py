@@ -143,7 +143,7 @@ class AccessCheckerMiddleware(BaseMiddleware):
         print(f"User ID: {user_id}, Admin ID from .env: {ADMIN_ID}")
 
         # Команды, которые должны работать без проверки доступа
-        allowed_commands = ['/start', '/subscribe', '/support', '/documents', '/admin']
+        allowed_commands = ['/start', '/subscribe', '/support', '/documents', '/admin', '/check_payment']
         
         # Проверяем, является ли это командой, которую нужно пропустить
         if isinstance(event, Message) and event.text:
