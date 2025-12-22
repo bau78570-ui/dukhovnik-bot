@@ -201,10 +201,10 @@ async def subscribe_handler(message: Message, bot: Bot, state: FSMContext):
         
         logger.info(f"Платеж создан успешно: payment_id={payment_id} для user_id={user_id}")
         
-        # Создаем инлайн-кнопку с ссылкой на оплату
+        # Создаем инлайн-кнопку с прямой ссылкой на оплату ЮKassa
         builder = InlineKeyboardBuilder()
         builder.button(
-            text="Оплатить 299 ₽",
+            text="Оплатить",
             url=confirmation_url
         )
         

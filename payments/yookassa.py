@@ -50,7 +50,7 @@ async def create_premium_payment(user_id: int, description: str = "Premium по�
             },
             "confirmation": {
                 "type": "redirect",
-                "return_url": "https://t.me/dukhovnik_bot"  # URL для возврата после оплаты
+                "return_url": "https://t.me/Dukhovnik_bot"  # URL для возврата после оплаты
             },
             "capture": True,
             "description": description,
