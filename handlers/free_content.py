@@ -214,7 +214,7 @@ async def subscribe_handler(message: Message, bot: Bot, state: FSMContext):
             user_data['pending_payments'] = {}
         user_data['pending_payments'][payment_id] = {
             'created_at': datetime.now().isoformat(),
-            'amount': 299.0,
+            'amount': payment_info.get("amount"),
             'status': 'pending'
         }
         logger.info(f"Payment_id={payment_id} сохранен для user_id={user_id}")
