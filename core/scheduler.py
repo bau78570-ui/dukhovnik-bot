@@ -15,6 +15,7 @@ from aiogram import Bot
 from aiogram.types import FSInputFile # Добавляем импорт FSInputFile
 from aiogram.enums import ParseMode
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from html import escape
 
 from core.content_library import daily_quotes, fasting_content, reading_plans, daily_words # Добавляем daily_words
 from core.user_database import user_db, get_all_users_with_namedays
@@ -174,9 +175,13 @@ async def send_morning_notification(bot: Bot):
     if len(scripture) > max_scripture_len:
         display_scripture = scripture[:max_scripture_len].rsplit(' ', 1)[0] + "..." # Обрезаем по слову
     
+    # Экранируем theme и scripture для безопасной вставки в HTML
+    theme_escaped = escape(theme) if theme else ""
+    display_scripture_escaped = escape(display_scripture) if display_scripture else ""
+    
     caption = (
-        f"✨ <b>{today_formatted} - {theme}</b> ✨\n\n"
-        f"📖 <b>{display_scripture}</b>\n\n"
+        f"✨ <b>{today_formatted} - {theme_escaped}</b> ✨\n\n"
+        f"📖 <b>{display_scripture_escaped}</b>\n\n"
         f"{ai_reflection_html}\n\n"
         f"#Православие #СловоДня #Размышление"
     )
@@ -300,9 +305,12 @@ async def _send_daily_word_notification(bot: Bot, notification_type: str, hour: 
 
     # Формирование caption
     today_formatted = datetime.now().strftime('%d.%m.%Y')
+    # Экранируем theme и scripture для безопасной вставки в HTML
+    theme_escaped = escape(theme) if theme else ""
+    scripture_escaped = escape(scripture) if scripture else ""
     caption = (
-        f"✨ <b>{today_formatted} - {theme}</b> ✨\n\n"
-        f"📖 <b>{scripture}</b>\n\n"
+        f"✨ <b>{today_formatted} - {theme_escaped}</b> ✨\n\n"
+        f"📖 <b>{scripture_escaped}</b>\n\n"
         f"{ai_reflection_html}\n\n"
         f"#Православие #СловоДня #Размышление"
     )
