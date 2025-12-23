@@ -7,7 +7,6 @@ from datetime import datetime # Импортируем datetime
 from core.content_sender import send_and_delete_previous, send_content_message # Импортируем новую централизованную функцию
 from core.user_database import get_user, user_db # Импортируем get_user и user_db
 from core.subscription_checker import is_premium # Импортируем is_premium
-from handlers.payment_handler import check_and_activate_payment # Импортируем функцию проверки платежей
 import logging # Импортируем logging
 
 # Создаем роутер для этого обработчика
@@ -36,10 +35,13 @@ async def command_start_handler(message: Message, bot: Bot, state: FSMContext) -
         get_user(user_id)  # Создает запись пользователя, если его еще нет
     
     # Проверяем pending платежи при возврате пользователя (например, после оплаты на сайте ЮKassa)
+    # Используем ленивый импорт, чтобы избежать циклического импорта
     user_data = get_user(user_id)
     pending_payments = user_data.get('pending_payments', {})
     if pending_payments:
         logging.info(f"Обнаружены pending платежи для user_id={user_id}, проверяем статус...")
+        # Импортируем функцию внутри обработчика, чтобы избежать циклического импорта
+        from handlers.payment_handler import check_and_activate_payment
         activated = False
         for payment_id, payment_info in list(pending_payments.items()):
             if payment_info.get('status') == 'pending':
