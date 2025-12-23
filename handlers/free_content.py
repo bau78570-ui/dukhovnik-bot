@@ -204,9 +204,10 @@ async def subscribe_handler(message: Message, bot: Bot, state: FSMContext):
         # Создаем инлайн-кнопку с прямой ссылкой на оплату ЮKassa
         builder = InlineKeyboardBuilder()
         builder.button(
-            text="Оплатить",
+            text="Оплатить 299 ₽ через ЮKassa",
             url=confirmation_url
         )
+        logging.info(f"Отправлена прямая ссылка на оплату: {confirmation_url}")
         
         # Сохраняем payment_id в данные пользователя для последующей проверки
         user_data = get_user(user_id)
