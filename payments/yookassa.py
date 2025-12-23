@@ -6,6 +6,7 @@ import os
 import logging
 from datetime import datetime, timedelta
 from yookassa import Configuration, Payment
+import uuid
 from yookassa.domain.notification import WebhookNotificationFactory
 from yookassa.domain.models.currency import Currency
 from yookassa.domain.models.receipt import Receipt, ReceiptItem, PaymentMode, PaymentSubject
@@ -63,15 +64,17 @@ async def create_premium_payment(user_id: int, description: str = "Premium по�
         }
         
         logger.info(f"Отправка запроса на создание платежа в ЮKassa (тестовый режим: {YOOKASSA_TEST})")
-        # Используем детерминированный idempotency_key для предотвращения дублирования платежей
-        # При повторных вызовах с тем же ключом ЮKassa вернет существующий платеж
-        payment = Payment.create(payment_data, idempotency_key=f"premium_{user_id}_subscription")
+        # Генерируем уникальный idempotency_key, чтобы всегда получать новый payment_id и свежую ссылку
+        payment = Payment.create(payment_data, idempotency_key=f"premium_{user_id}_{uuid.uuid4()}")
         
         payment_id = payment.id
         confirmation_url = payment.confirmation.confirmation_url
         status = payment.status
         
-        logger.info(f"Платеж создан успешно: payment_id={payment_id}, status={status}, confirmation_url={confirmation_url[:50]}...")
+        logger.info(
+            f"Платеж создан успешно: payment_id={payment_id}, status={status}, confirmation_type={payment.confirmation.type}, "
+            f"confirmation_url={confirmation_url}"
+        )
         
         return {
             "payment_id": payment_id,
