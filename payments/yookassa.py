@@ -6,7 +6,6 @@ import os
 import logging
 from datetime import datetime, timedelta
 from yookassa import Configuration, Payment
-import uuid
 from yookassa.domain.notification import WebhookNotificationFactory
 from yookassa.domain.models.currency import Currency
 from yookassa.domain.models.receipt import Receipt, ReceiptItem, PaymentMode, PaymentSubject
@@ -32,6 +31,7 @@ logger = logging.getLogger(__name__)
 async def create_premium_payment(user_id: int, description: str = "Premium подписка на 30 дней") -> dict:
     """
     Создает платеж для Premium подписки на 30 дней (299 ₽).
+    Проверяет существующие pending платежи перед созданием нового для предотвращения дублирования.
     
     Args:
         user_id: ID пользователя Telegram
@@ -43,7 +43,49 @@ async def create_premium_payment(user_id: int, description: str = "Premium по�
     try:
         logger.info(f"Создание платежа для user_id={user_id}, цена={PREMIUM_PRICE} ₽")
         
-        # Создаем платеж через ЮKassa API
+        # Проверяем существующие pending платежи пользователя
+        from core.user_database import get_user
+        user_data = get_user(user_id)
+        pending_payments = user_data.get('pending_payments', {})
+        
+        # Ищем pending платеж с валидной ссылкой
+        for existing_payment_id, payment_info in pending_payments.items():
+            if payment_info.get('status') == 'pending':
+                try:
+                    # Проверяем статус существующего платежа в ЮKassa
+                    payment_status = await check_payment_status(existing_payment_id)
+                    status = payment_status.get("status", "")
+                    paid = payment_status.get("paid", False)
+                    
+                    # Если платеж еще pending и не оплачен, получаем его данные
+                    if status == "pending" and not paid:
+                        try:
+                            payment = Payment.find_one(existing_payment_id)
+                            confirmation_url = payment.confirmation.confirmation_url
+                            
+                            # Проверяем, что ссылка не содержит paywall.tg
+                            if confirmation_url and "paywall.tg" not in confirmation_url:
+                                logger.info(
+                                    f"Используется существующий pending платеж: payment_id={existing_payment_id}, "
+                                    f"confirmation_url={confirmation_url}"
+                                )
+                                return {
+                                    "payment_id": existing_payment_id,
+                                    "confirmation_url": confirmation_url,
+                                    "status": status,
+                                    "amount": PREMIUM_PRICE,
+                                    "currency": "RUB"
+                                }
+                        except Exception as e:
+                            logger.warning(f"Не удалось получить данные существующего платежа {existing_payment_id}: {e}")
+                    elif paid or status == "succeeded":
+                        # Платеж уже оплачен, удаляем из pending
+                        logger.info(f"Платеж {existing_payment_id} уже оплачен, создаем новый")
+                        del pending_payments[existing_payment_id]
+                except Exception as e:
+                    logger.warning(f"Ошибка при проверке существующего платежа {existing_payment_id}: {e}")
+        
+        # Создаем новый платеж через ЮKassa API
         payment_data = {
             "amount": {
                 "value": f"{PREMIUM_PRICE:.2f}",
@@ -64,8 +106,9 @@ async def create_premium_payment(user_id: int, description: str = "Premium по�
         }
         
         logger.info(f"Отправка запроса на создание платежа в ЮKassa (тестовый режим: {YOOKASSA_TEST})")
-        # Генерируем уникальный idempotency_key, чтобы всегда получать новый payment_id и свежую ссылку
-        payment = Payment.create(payment_data, idempotency_key=f"premium_{user_id}_{uuid.uuid4()}")
+        # Используем детерминированный idempotency_key для предотвращения дублирования платежей
+        # При повторных вызовах с тем же ключом ЮKassa вернет существующий платеж
+        payment = Payment.create(payment_data, idempotency_key=f"premium_{user_id}_subscription")
         
         payment_id = payment.id
         confirmation_url = payment.confirmation.confirmation_url
