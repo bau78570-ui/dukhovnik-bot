@@ -48,7 +48,8 @@ async def create_premium_payment(user_id: int, description: str = "Premium по�
         user_data = get_user(user_id)
         pending_payments = user_data.get('pending_payments', {})
         
-        # Ищем pending платеж с валидной ссылкой
+        # Очищаем старые pending платежи со ссылками на paywall.tg
+        payments_to_remove = []
         for existing_payment_id, payment_info in pending_payments.items():
             if payment_info.get('status') == 'pending':
                 try:
@@ -57,14 +58,25 @@ async def create_premium_payment(user_id: int, description: str = "Premium по�
                     status = payment_status.get("status", "")
                     paid = payment_status.get("paid", False)
                     
-                    # Если платеж еще pending и не оплачен, получаем его данные
-                    if status == "pending" and not paid:
+                    if paid or status == "succeeded":
+                        # Платеж уже оплачен, удаляем из pending
+                        logger.info(f"Платеж {existing_payment_id} уже оплачен, удаляем из pending")
+                        payments_to_remove.append(existing_payment_id)
+                    elif status == "pending" and not paid:
+                        # Проверяем ссылку платежа
                         try:
                             payment = Payment.find_one(existing_payment_id)
                             confirmation_url = payment.confirmation.confirmation_url
                             
-                            # Проверяем, что ссылка не содержит paywall.tg
-                            if confirmation_url and "paywall.tg" not in confirmation_url:
+                            # Если ссылка ведет на paywall.tg, удаляем такой платеж
+                            if confirmation_url and "paywall.tg" in confirmation_url:
+                                logger.info(
+                                    f"Найден pending платеж со ссылкой на paywall.tg: payment_id={existing_payment_id}, "
+                                    f"удаляем из pending и создадим новый"
+                                )
+                                payments_to_remove.append(existing_payment_id)
+                            # Если ссылка валидная, используем этот платеж
+                            elif confirmation_url and "paywall.tg" not in confirmation_url:
                                 logger.info(
                                     f"Используется существующий pending платеж: payment_id={existing_payment_id}, "
                                     f"confirmation_url={confirmation_url}"
@@ -78,12 +90,13 @@ async def create_premium_payment(user_id: int, description: str = "Premium по�
                                 }
                         except Exception as e:
                             logger.warning(f"Не удалось получить данные существующего платежа {existing_payment_id}: {e}")
-                    elif paid or status == "succeeded":
-                        # Платеж уже оплачен, удаляем из pending
-                        logger.info(f"Платеж {existing_payment_id} уже оплачен, создаем новый")
-                        del pending_payments[existing_payment_id]
                 except Exception as e:
                     logger.warning(f"Ошибка при проверке существующего платежа {existing_payment_id}: {e}")
+        
+        # Удаляем помеченные платежи
+        for payment_id_to_remove in payments_to_remove:
+            if payment_id_to_remove in pending_payments:
+                del pending_payments[payment_id_to_remove]
         
         # Создаем новый платеж через ЮKassa API
         payment_data = {
@@ -105,19 +118,56 @@ async def create_premium_payment(user_id: int, description: str = "Premium по�
             "test": YOOKASSA_TEST
         }
         
-        logger.info(f"Отправка запроса на создание платежа в ЮKassa (тестовый режим: {YOOKASSA_TEST})")
+        logger.info(
+            f"Отправка запроса на создание платежа в ЮKassa (тестовый режим: {YOOKASSA_TEST}). "
+            f"Параметры: confirmation.type={payment_data['confirmation']['type']}, "
+            f"return_url={payment_data['confirmation']['return_url']}"
+        )
         # Используем детерминированный idempotency_key для предотвращения дублирования платежей
         # При повторных вызовах с тем же ключом ЮKassa вернет существующий платеж
-        payment = Payment.create(payment_data, idempotency_key=f"premium_{user_id}_subscription")
+        idempotency_key = f"premium_{user_id}_subscription"
+        payment = Payment.create(payment_data, idempotency_key=idempotency_key)
         
         payment_id = payment.id
         confirmation_url = payment.confirmation.confirmation_url
         status = payment.status
         
-        logger.info(
-            f"Платеж создан успешно: payment_id={payment_id}, status={status}, confirmation_type={payment.confirmation.type}, "
-            f"confirmation_url={confirmation_url}"
-        )
+        # Проверяем, что полученная ссылка не ведет на paywall.tg
+        # Если ведет, создаем новый платеж с другим ключом
+        if confirmation_url and "paywall.tg" in confirmation_url:
+            logger.warning(
+                f"Получен платеж с ссылкой на paywall.tg: payment_id={payment_id}, "
+                f"создаем новый платеж с другим idempotency_key"
+            )
+            # Создаем новый платеж с другим ключом, добавляя timestamp
+            from datetime import datetime
+            idempotency_key = f"premium_{user_id}_subscription_{int(datetime.now().timestamp())}"
+            payment = Payment.create(payment_data, idempotency_key=idempotency_key)
+            payment_id = payment.id
+            confirmation_url = payment.confirmation.confirmation_url
+            status = payment.status
+            
+            # Если и новый платеж имеет ссылку на paywall.tg, логируем ошибку
+            if confirmation_url and "paywall.tg" in confirmation_url:
+                logger.error(
+                    f"КРИТИЧЕСКАЯ ОШИБКА: Новый платеж также имеет ссылку на paywall.tg: "
+                    f"payment_id={payment_id}, confirmation_url={confirmation_url}"
+                )
+        
+        # Финальная проверка ссылки перед возвратом
+        if confirmation_url and "paywall.tg" in confirmation_url:
+            logger.error(
+                f"КРИТИЧЕСКАЯ ОШИБКА: Финальный платеж все еще имеет ссылку на paywall.tg: "
+                f"payment_id={payment_id}, confirmation_url={confirmation_url}. "
+                f"Возможно, проблема в настройках ЮKassa или требуется проверка параметров платежа."
+            )
+            # Все равно возвращаем, но с предупреждением в логах
+        else:
+            logger.info(
+                f"Платеж создан успешно с валидной ссылкой: payment_id={payment_id}, "
+                f"status={status}, confirmation_type={payment.confirmation.type}, "
+                f"confirmation_url={confirmation_url[:100]}..."
+            )
         
         return {
             "payment_id": payment_id,
