@@ -7,6 +7,7 @@ from datetime import datetime # Импортируем datetime
 from core.content_sender import send_and_delete_previous, send_content_message # Импортируем новую централизованную функцию
 from core.user_database import get_user, user_db # Импортируем get_user и user_db
 from core.subscription_checker import is_premium # Импортируем is_premium
+from handlers.payment_handler import check_and_activate_payment # Импортируем функцию проверки платежей
 import logging # Импортируем logging
 
 # Создаем роутер для этого обработчика
@@ -33,6 +34,36 @@ async def command_start_handler(message: Message, bot: Bot, state: FSMContext) -
         logging.info(f"Новый пользователь добавлен: {user_id}")
     else:
         get_user(user_id)  # Создает запись пользователя, если его еще нет
+    
+    # Проверяем pending платежи при возврате пользователя (например, после оплаты на сайте ЮKassa)
+    user_data = get_user(user_id)
+    pending_payments = user_data.get('pending_payments', {})
+    if pending_payments:
+        logging.info(f"Обнаружены pending платежи для user_id={user_id}, проверяем статус...")
+        activated = False
+        for payment_id, payment_info in list(pending_payments.items()):
+            if payment_info.get('status') == 'pending':
+                try:
+                    if await check_and_activate_payment(user_id, payment_id):
+                        activated = True
+                        logging.info(f"Premium подписка автоматически активирована для user_id={user_id} после оплаты payment_id={payment_id}")
+                except Exception as e:
+                    logging.error(f"Ошибка при автоматической проверке платежа {payment_id} для user_id={user_id}: {e}", exc_info=True)
+        
+        if activated:
+            # Отправляем уведомление об активации Premium
+            await message.answer(
+                "✨ <b>Отлично! Premium подписка активирована!</b> ✨\n\n"
+                "Ваша Premium подписка на 30 дней успешно активирована.\n\n"
+                "Теперь у вас есть доступ ко всем Premium функциям:\n"
+                "💬 Безграничные диалоги с AI-Собеседником\n"
+                "📖 Ежедневное «Слово Дня» с AI-размышлением\n"
+                "🙏 Помощь в составлении молитв\n"
+                "🗓️ Расширенный Православный Календарь\n"
+                "⚙️ Персонализированные уведомления\n\n"
+                "Желаем вам духовного роста и гармонии! 🙏",
+                parse_mode='HTML'
+            )
     
     chat_id = message.chat.id
     

@@ -25,6 +25,10 @@ Configuration.secret_key = YOOKASSA_SECRET_KEY
 PREMIUM_PRICE = 299.00  # Цена в рублях
 PREMIUM_DURATION_DAYS = 30  # Длительность подписки в днях
 
+# Тестовая карта для тестового режима ЮKassa: 5555 5555 5555 4444
+# Срок действия: любая будущая дата (например, 12/25)
+# CVV: любые 3 цифры (например, 123)
+
 logger = logging.getLogger(__name__)
 
 
