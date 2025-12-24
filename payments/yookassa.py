@@ -7,8 +7,6 @@ import logging
 from datetime import datetime, timedelta
 from yookassa import Configuration, Payment
 from yookassa.domain.notification import WebhookNotificationFactory
-from yookassa.domain.models.currency import Currency
-from yookassa.domain.models.receipt import Receipt, ReceiptItem, PaymentMode, PaymentSubject
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -103,34 +101,26 @@ async def create_premium_payment(user_id: int, description: str = "Premium по�
                 del pending_payments[payment_id_to_remove]
         
         # Создаем новый платеж через ЮKassa API
-        payment_data = {
-            "amount": {
-                "value": f"{PREMIUM_PRICE:.2f}",
-                "currency": Currency.RUB
-            },
-            "confirmation": {
-                "type": "redirect",
-                "return_url": "https://t.me/dukhovnik_bot"  # URL для возврата после оплаты
-            },
-            "capture": True,
-            "description": description,
-            "metadata": {
-                "user_id": str(user_id),
-                "subscription_type": "premium_30_days",
-                "subscription_duration_days": str(PREMIUM_DURATION_DAYS)
-            },
-            "test": YOOKASSA_TEST
+        metadata = {
+            "user_id": str(user_id),
+            "subscription_type": "premium_30_days",
+            "subscription_duration_days": str(PREMIUM_DURATION_DAYS)
         }
         
         logger.info(
             f"Отправка запроса на создание платежа в ЮKassa (тестовый режим: {YOOKASSA_TEST}). "
-            f"Параметры: confirmation.type={payment_data['confirmation']['type']}, "
-            f"return_url={payment_data['confirmation']['return_url']}"
+            f"Параметры: confirmation.type=redirect, return_url=https://t.me/dukhovnik_bot"
         )
         # Используем детерминированный idempotency_key для предотвращения дублирования платежей
         # При повторных вызовах с тем же ключом ЮKassa вернет существующий платеж
         idempotency_key = f"premium_{user_id}_subscription"
-        payment = Payment.create(payment_data, idempotency_key=idempotency_key)
+        payment = Payment.create({
+            "amount": {"value": f"{PREMIUM_PRICE:.2f}", "currency": "RUB"},
+            "confirmation": {"type": "redirect", "return_url": "https://t.me/dukhovnik_bot"},
+            "capture": True,
+            "description": description,
+            "metadata": metadata
+        }, idempotency_key=idempotency_key)
         
         payment_id = payment.id
         confirmation_url = payment.confirmation.confirmation_url
@@ -146,7 +136,13 @@ async def create_premium_payment(user_id: int, description: str = "Premium по�
             # Создаем новый платеж с другим ключом, добавляя timestamp
             from datetime import datetime
             idempotency_key = f"premium_{user_id}_subscription_{int(datetime.now().timestamp())}"
-            payment = Payment.create(payment_data, idempotency_key=idempotency_key)
+            payment = Payment.create({
+                "amount": {"value": f"{PREMIUM_PRICE:.2f}", "currency": "RUB"},
+                "confirmation": {"type": "redirect", "return_url": "https://t.me/dukhovnik_bot"},
+                "capture": True,
+                "description": description,
+                "metadata": metadata
+            }, idempotency_key=idempotency_key)
             payment_id = payment.id
             confirmation_url = payment.confirmation.confirmation_url
             status = payment.status
