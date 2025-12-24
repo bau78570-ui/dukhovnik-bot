@@ -172,25 +172,6 @@ async def molitva_handler(message: Message, bot: Bot, state: FSMContext):
     if sent_message:
         await state.update_data(last_bot_message_id=sent_message.message_id)
 
-@router.message(Command("subscribe"))
-async def subscribe_handler(message: Message, bot: Bot, state: FSMContext):
-    """
-    Обработчик для команды /subscribe.
-    Отправляет предложение о подписке.
-    """
-    logger = logging.getLogger(__name__)
-    user_id = message.from_user.id
-    
-    logger.info(f"Команда /subscribe от user_id={user_id}")
-    
-    # Активируем бесплатный период, если он еще не был активирован
-    await activate_trial(user_id)
-    logger.info(f"Бесплатный период активирован/проверен для user_id={user_id}")
-    
-
-
-
-
 @router.message(Command("daily_word"))
 async def daily_word_handler(message: Message, bot: Bot, state: FSMContext):
     """
