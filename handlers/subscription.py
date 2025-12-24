@@ -73,9 +73,19 @@ async def check_payment_config_handler(message: Message, bot: Bot):
     """
     user_id = message.from_user.id
     
+    # Явное логирование в консоль и файл
+    print(f"=== CHECK_PAYMENT_CONFIG HANDLER CALLED ===")
+    print(f"User ID: {user_id}")
+    print(f"Message text: {message.text}")
+    logger.info(f"=== CHECK_PAYMENT_CONFIG HANDLER CALLED ===")
     logger.info(f"Команда /check_payment_config от user_id={user_id}")
+    logger.info(f"Message text: {message.text}")
     
     try:
+        # Сначала отправляем простое сообщение для проверки
+        await message.answer("⏳ Проверяю конфигурацию...", parse_mode='HTML')
+        logger.info(f"Предварительное сообщение отправлено для user_id={user_id}")
+        
         config_info = (
             f"🔍 <b>Конфигурация платежей:</b>\n\n"
             f"Режим: <b>{'TEST' if TELEGRAM_PAYMENTS_TEST else 'LIVE'}</b>\n"
@@ -92,16 +102,25 @@ async def check_payment_config_handler(message: Message, bot: Bot):
             config_info += f"Первые 20 символов токена: <code>{provider_token[:20]}...</code>\n"
             config_info += f"Последние 10 символов токена: <code>...{provider_token[-10:]}</code>\n"
         
-        logger.info(f"Отправка конфигурации для user_id={user_id}")
+        logger.info(f"Формирование конфигурации завершено для user_id={user_id}")
+        logger.info(f"Длина config_info: {len(config_info)} символов")
+        
         await message.answer(config_info, parse_mode='HTML')
         logger.info(f"Конфигурация успешно отправлена для user_id={user_id}")
+        print(f"=== CONFIG SENT SUCCESSFULLY ===")
         
     except Exception as e:
-        logger.error(f"Ошибка в check_payment_config_handler для user_id={user_id}: {e}", exc_info=True)
-        await message.answer(
-            f"❌ Ошибка при получении конфигурации: {str(e)}",
-            parse_mode='HTML'
-        )
+        error_msg = str(e)
+        print(f"=== ERROR IN CHECK_PAYMENT_CONFIG ===")
+        print(f"Error: {error_msg}")
+        logger.error(f"ОШИБКА в check_payment_config_handler для user_id={user_id}: {error_msg}", exc_info=True)
+        try:
+            await message.answer(
+                f"❌ Ошибка при получении конфигурации:\n\n<code>{error_msg}</code>",
+                parse_mode='HTML'
+            )
+        except Exception as e2:
+            logger.error(f"Не удалось отправить сообщение об ошибке: {e2}", exc_info=True)
 
 
 @router.message(Command("subscribe"))

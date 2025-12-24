@@ -149,8 +149,11 @@ class AccessCheckerMiddleware(BaseMiddleware):
         if isinstance(event, Message) and event.text:
             # Извлекаем команду из текста (учитываем формат /command или /command@botname)
             command_text = event.text.split()[0].split('@')[0] if event.text else ""
+            print(f"DEBUG: Checking command '{command_text}' in allowed_commands: {command_text in allowed_commands}")
+            logging.info(f"DEBUG: Checking command '{command_text}' in allowed_commands: {command_text in allowed_commands}")
             if command_text in allowed_commands:
                 print(f"INFO: Command {command_text} is allowed without access check. Access GRANTED.")
+                logging.info(f"INFO: Command {command_text} is allowed without access check. Access GRANTED.")
                 print("--- Access Check Finished ---\n")
                 return await handler(event, data)
 
