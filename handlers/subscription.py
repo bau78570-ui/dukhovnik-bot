@@ -28,21 +28,67 @@ provider_token = PROVIDER_TOKEN_TEST if TELEGRAM_PAYMENTS_TEST else PROVIDER_TOK
 
 logger = logging.getLogger(__name__)
 
+# Логируем информацию о токене при загрузке модуля (без полного токена для безопасности)
+if provider_token:
+    logger.info(f"Provider token загружен. Режим: {'TEST' if TELEGRAM_PAYMENTS_TEST else 'LIVE'}, длина токена: {len(provider_token)}")
+    logger.info(f"Первые 15 символов токена: {provider_token[:15]}...")
+else:
+    logger.error(f"Provider token НЕ ЗАГРУЖЕН! TEST mode: {TELEGRAM_PAYMENTS_TEST}")
+    logger.error(f"PROVIDER_TOKEN_TEST: {'установлен' if PROVIDER_TOKEN_TEST else 'НЕ установлен'}")
+    logger.error(f"PROVIDER_TOKEN_LIVE: {'установлен' if PROVIDER_TOKEN_LIVE else 'НЕ установлен'}")
+
 # Функция для проверки валидности provider_token
 def validate_provider_token(token: str) -> bool:
     """
     Проверяет, что provider_token не пустой и имеет правильный формат.
     Для Telegram Payments с ЮKassa токен должен быть непустой строкой.
+    Формат токена от @YooKassa обычно: "381764678:TEST:157405" или "390540012:LIVE:85359"
     """
     if not token:
         return False
     # Минимальная проверка: токен должен содержать хотя бы несколько символов
     if len(token) < 10:
         return False
+    # Проверка формата: токен должен содержать двоеточия (формат shop_id:mode:token)
+    if ':' not in token:
+        logger.warning(f"Токен не содержит двоеточий, возможно неправильный формат: {token[:20]}...")
+        # Не блокируем, так как формат может быть разным
     return True
 
 # Создаем роутер для обработчиков подписки
 router = Router()
+
+
+@router.message(Command("check_payment_config"))
+async def check_payment_config_handler(message: Message, bot: Bot):
+    """
+    Команда для проверки конфигурации платежей (только для отладки).
+    """
+    user_id = message.from_user.id
+    
+    # Проверяем, что это админ (опционально, можно убрать)
+    # admin_id = os.getenv("ADMIN_ID", "")
+    # if admin_id and str(user_id) != admin_id:
+    #     await message.answer("Эта команда доступна только администратору.")
+    #     return
+    
+    config_info = (
+        f"🔍 <b>Конфигурация платежей:</b>\n\n"
+        f"Режим: <b>{'TEST' if TELEGRAM_PAYMENTS_TEST else 'LIVE'}</b>\n"
+        f"PROVIDER_TOKEN_TEST: <b>{'установлен' if PROVIDER_TOKEN_TEST else 'НЕ установлен'}</b> "
+        f"({len(PROVIDER_TOKEN_TEST)} символов)\n"
+        f"PROVIDER_TOKEN_LIVE: <b>{'установлен' if PROVIDER_TOKEN_LIVE else 'НЕ установлен'}</b> "
+        f"({len(PROVIDER_TOKEN_LIVE)} символов)\n"
+        f"Текущий provider_token: <b>{'установлен' if provider_token else 'НЕ установлен'}</b> "
+        f"({len(provider_token) if provider_token else 0} символов)\n"
+        f"Валидность токена: <b>{'✅ Валиден' if validate_provider_token(provider_token) else '❌ Невалиден'}</b>\n\n"
+    )
+    
+    if provider_token:
+        config_info += f"Первые 20 символов токена: <code>{provider_token[:20]}...</code>\n"
+        config_info += f"Последние 10 символов токена: <code>...{provider_token[-10:]}</code>\n"
+    
+    await message.answer(config_info, parse_mode='HTML')
 
 
 @router.message(Command("subscribe"))
@@ -73,10 +119,12 @@ async def subscribe_handler(message: Message, bot: Bot, state: FSMContext):
         # Формируем payload с уникальным идентификатором
         payload = f"premium_30_days_{user_id}_{int(datetime.now().timestamp())}"
         
-        logger.info(f"Отправка invoice для user_id={user_id}, provider_token (первые 10 символов): {provider_token[:10]}...")
+        logger.info(f"Отправка invoice для user_id={user_id}")
+        logger.info(f"Provider token (первые 15 символов): {provider_token[:15]}..., длина: {len(provider_token)}")
+        logger.info(f"Chat ID: {message.chat.id}, Payload: {payload}")
         
         # Отправляем invoice
-        await bot.send_invoice(
+        invoice_result = await bot.send_invoice(
             chat_id=message.chat.id,
             title="Premium «Духовник» на 30 дней",
             description="Безграничный доступ к AI-собеседнику, Слову дня и молитвам",
@@ -86,11 +134,16 @@ async def subscribe_handler(message: Message, bot: Bot, state: FSMContext):
             prices=[LabeledPrice(label="Premium 30 дней", amount=29900)],  # 299 рублей = 29900 копеек
         )
         
-        logger.info(f"Invoice отправлен для user_id={user_id}, payload={payload}")
+        logger.info(f"Invoice успешно отправлен для user_id={user_id}, payload={payload}, message_id={invoice_result.message_id}")
         
     except Exception as e:
         error_message = str(e)
-        logger.error(f"Ошибка при отправке invoice для user_id={user_id}: {error_message}", exc_info=True)
+        error_type = type(e).__name__
+        logger.error(f"ОШИБКА при отправке invoice для user_id={user_id}")
+        logger.error(f"Тип ошибки: {error_type}")
+        logger.error(f"Сообщение ошибки: {error_message}")
+        logger.error(f"Provider token (первые 15 символов): {provider_token[:15] if provider_token else 'НЕТ ТОКЕНА'}...")
+        logger.error(f"Полная информация об ошибке:", exc_info=True)
         
         # Более детальное сообщение об ошибке для отладки
         if "provider_token" in error_message.lower() or "invalid" in error_message.lower():
