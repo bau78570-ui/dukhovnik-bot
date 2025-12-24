@@ -12,13 +12,20 @@ from core.subscription_checker import activate_premium_subscription, activate_tr
 load_dotenv()
 
 # Получаем токены из .env
-# ВАЖНО: PROVIDER_TOKEN - это токен для Telegram Payments, который выдается через бота @YooKassa
-# Это НЕ токен от ЮKassa API напрямую. Чтобы получить токен:
-# 1. Откройте бота @YooKassa в Telegram
-# 2. Выполните команду /start
-# 3. Подключите ваш магазин (shop_id)
-# 4. Бот выдаст вам токен для Telegram Payments
+# ВАЖНО: PROVIDER_TOKEN - это токен для Telegram Payments, который выдается через @BotFather
+# после подключения вашего бота к боту ЮKassa.
+# 
+# Инструкция по получению токена (согласно https://yookassa.ru/docs/support/payments/onboarding/integration/cms-module/telegram):
+# 1. Откройте @BotFather в Telegram
+# 2. Выполните команду /mybots
+# 3. Выберите вашего бота
+# 4. Выберите "Payments"
+# 5. Выберите "Connect ЮKassa: тест" (для теста) или "Connect ЮKassa: платежи" (для продакшена)
+# 6. Авторизуйтесь в ЮKassa и разрешите доступ
+# 7. @BotFather покажет вам токен - это и есть PROVIDER_TOKEN
+# 
 # Формат токена обычно: "381764678:TEST:157405" для тестового режима
+# или "390540012:LIVE:85359" для продакшена
 PROVIDER_TOKEN_TEST = os.getenv("PROVIDER_TOKEN_TEST", "").strip()
 PROVIDER_TOKEN_LIVE = os.getenv("PROVIDER_TOKEN_LIVE", "").strip()
 TELEGRAM_PAYMENTS_TEST = os.getenv("TELEGRAM_PAYMENTS_TEST", "True").lower() == "true"
@@ -104,9 +111,17 @@ async def subscribe_handler(message: Message, bot: Bot, state: FSMContext):
     # Проверяем наличие provider_token
     if not validate_provider_token(provider_token):
         logger.error(f"Provider token не настроен или невалиден. TEST mode: {TELEGRAM_PAYMENTS_TEST}")
+        logger.error(f"PROVIDER_TOKEN_TEST: {'установлен' if PROVIDER_TOKEN_TEST else 'НЕ установлен'}")
+        logger.error(f"PROVIDER_TOKEN_LIVE: {'установлен' if PROVIDER_TOKEN_LIVE else 'НЕ установлен'}")
         await message.answer(
             "❌ <b>Ошибка конфигурации платежей.</b>\n\n"
-            "Платежная система не настроена. Пожалуйста, обратитесь в поддержку: /support",
+            "Платежная система не настроена.\n\n"
+            "<b>Как настроить:</b>\n"
+            "1. Откройте @BotFather в Telegram\n"
+            "2. Выполните /mybots → выберите бота → Payments\n"
+            "3. Подключите ЮKassa (тест или продакшен)\n"
+            "4. Скопируйте токен в .env файл как PROVIDER_TOKEN_TEST или PROVIDER_TOKEN_LIVE\n\n"
+            "Подробная инструкция: https://yookassa.ru/docs/support/payments/onboarding/integration/cms-module/telegram",
             parse_mode='HTML'
         )
         return
@@ -146,15 +161,27 @@ async def subscribe_handler(message: Message, bot: Bot, state: FSMContext):
         logger.error(f"Полная информация об ошибке:", exc_info=True)
         
         # Более детальное сообщение об ошибке для отладки
-        if "provider_token" in error_message.lower() or "invalid" in error_message.lower():
+        if "provider_token" in error_message.lower() or "invalid" in error_message.lower() or "bad request" in error_message.lower():
             error_text = (
                 "❌ <b>Ошибка при создании платежа.</b>\n\n"
-                "Проблема с настройкой платежного провайдера. "
-                "Пожалуйста, обратитесь в поддержку: /support"
+                "Проблема с настройкой платежного провайдера.\n\n"
+                "<b>Возможные причины:</b>\n"
+                "• Токен неверный или устарел\n"
+                "• Бот не подключен к ЮKassa через @BotFather\n"
+                "• Магазин не работает на протоколе API\n\n"
+                "Проверьте настройки через команду /check_payment_config\n"
+                "Инструкция: https://yookassa.ru/docs/support/payments/onboarding/integration/cms-module/telegram"
+            )
+        elif "unauthorized" in error_message.lower() or "401" in error_message.lower():
+            error_text = (
+                "❌ <b>Ошибка авторизации.</b>\n\n"
+                "Токен платежного провайдера неверный или истек срок действия.\n\n"
+                "Проверьте токен через @BotFather → Payments"
             )
         else:
             error_text = (
                 "❌ <b>Произошла ошибка при создании платежа.</b>\n\n"
+                f"Тип ошибки: {error_type}\n\n"
                 "Пожалуйста, попробуйте позже или обратитесь в поддержку: /support"
             )
         
@@ -174,9 +201,17 @@ async def subscribe_callback_handler(callback_query: CallbackQuery, bot: Bot, st
     # Проверяем наличие provider_token
     if not validate_provider_token(provider_token):
         logger.error(f"Provider token не настроен или невалиден. TEST mode: {TELEGRAM_PAYMENTS_TEST}")
+        logger.error(f"PROVIDER_TOKEN_TEST: {'установлен' if PROVIDER_TOKEN_TEST else 'НЕ установлен'}")
+        logger.error(f"PROVIDER_TOKEN_LIVE: {'установлен' if PROVIDER_TOKEN_LIVE else 'НЕ установлен'}")
         await callback_query.message.answer(
             "❌ <b>Ошибка конфигурации платежей.</b>\n\n"
-            "Платежная система не настроена. Пожалуйста, обратитесь в поддержку: /support",
+            "Платежная система не настроена.\n\n"
+            "<b>Как настроить:</b>\n"
+            "1. Откройте @BotFather в Telegram\n"
+            "2. Выполните /mybots → выберите бота → Payments\n"
+            "3. Подключите ЮKassa (тест или продакшен)\n"
+            "4. Скопируйте токен в .env файл как PROVIDER_TOKEN_TEST или PROVIDER_TOKEN_LIVE\n\n"
+            "Подробная инструкция: https://yookassa.ru/docs/support/payments/onboarding/integration/cms-module/telegram",
             parse_mode='HTML'
         )
         await callback_query.answer()
@@ -208,18 +243,35 @@ async def subscribe_callback_handler(callback_query: CallbackQuery, bot: Bot, st
         
     except Exception as e:
         error_message = str(e)
-        logger.error(f"Ошибка при отправке invoice для user_id={user_id}: {error_message}", exc_info=True)
+        error_type = type(e).__name__
+        logger.error(f"ОШИБКА при отправке invoice для user_id={user_id}")
+        logger.error(f"Тип ошибки: {error_type}")
+        logger.error(f"Сообщение ошибки: {error_message}")
+        logger.error(f"Provider token (первые 15 символов): {provider_token[:15] if provider_token else 'НЕТ ТОКЕНА'}...")
+        logger.error(f"Полная информация об ошибке:", exc_info=True)
         
         # Более детальное сообщение об ошибке для отладки
-        if "provider_token" in error_message.lower() or "invalid" in error_message.lower():
+        if "provider_token" in error_message.lower() or "invalid" in error_message.lower() or "bad request" in error_message.lower():
             error_text = (
                 "❌ <b>Ошибка при создании платежа.</b>\n\n"
-                "Проблема с настройкой платежного провайдера. "
-                "Пожалуйста, обратитесь в поддержку: /support"
+                "Проблема с настройкой платежного провайдера.\n\n"
+                "<b>Возможные причины:</b>\n"
+                "• Токен неверный или устарел\n"
+                "• Бот не подключен к ЮKassa через @BotFather\n"
+                "• Магазин не работает на протоколе API\n\n"
+                "Проверьте настройки через команду /check_payment_config\n"
+                "Инструкция: https://yookassa.ru/docs/support/payments/onboarding/integration/cms-module/telegram"
+            )
+        elif "unauthorized" in error_message.lower() or "401" in error_message.lower():
+            error_text = (
+                "❌ <b>Ошибка авторизации.</b>\n\n"
+                "Токен платежного провайдера неверный или истек срок действия.\n\n"
+                "Проверьте токен через @BotFather → Payments"
             )
         else:
             error_text = (
                 "❌ <b>Произошла ошибка при создании платежа.</b>\n\n"
+                f"Тип ошибки: {error_type}\n\n"
                 "Пожалуйста, попробуйте позже или обратитесь в поддержку: /support"
             )
         

@@ -28,6 +28,10 @@ async def support_start(message: Message, state: FSMContext):
 @router.message(StateFilter(SupportState.waiting_for_message), F.text)
 async def support_message_received(message: Message, state: FSMContext, bot: Bot):
     """Получает сообщение пользователя и пересылает его админу."""
+    # Пропускаем команды - они должны обрабатываться другими обработчиками
+    if message.text and message.text.strip().startswith('/'):
+        return
+    
     await state.clear() # Сбрасываем состояние
     
     ADMIN_ID = os.getenv("ADMIN_ID")
