@@ -73,29 +73,35 @@ async def check_payment_config_handler(message: Message, bot: Bot):
     """
     user_id = message.from_user.id
     
-    # Проверяем, что это админ (опционально, можно убрать)
-    # admin_id = os.getenv("ADMIN_ID", "")
-    # if admin_id and str(user_id) != admin_id:
-    #     await message.answer("Эта команда доступна только администратору.")
-    #     return
+    logger.info(f"Команда /check_payment_config от user_id={user_id}")
     
-    config_info = (
-        f"🔍 <b>Конфигурация платежей:</b>\n\n"
-        f"Режим: <b>{'TEST' if TELEGRAM_PAYMENTS_TEST else 'LIVE'}</b>\n"
-        f"PROVIDER_TOKEN_TEST: <b>{'установлен' if PROVIDER_TOKEN_TEST else 'НЕ установлен'}</b> "
-        f"({len(PROVIDER_TOKEN_TEST)} символов)\n"
-        f"PROVIDER_TOKEN_LIVE: <b>{'установлен' if PROVIDER_TOKEN_LIVE else 'НЕ установлен'}</b> "
-        f"({len(PROVIDER_TOKEN_LIVE)} символов)\n"
-        f"Текущий provider_token: <b>{'установлен' if provider_token else 'НЕ установлен'}</b> "
-        f"({len(provider_token) if provider_token else 0} символов)\n"
-        f"Валидность токена: <b>{'✅ Валиден' if validate_provider_token(provider_token) else '❌ Невалиден'}</b>\n\n"
-    )
-    
-    if provider_token:
-        config_info += f"Первые 20 символов токена: <code>{provider_token[:20]}...</code>\n"
-        config_info += f"Последние 10 символов токена: <code>...{provider_token[-10:]}</code>\n"
-    
-    await message.answer(config_info, parse_mode='HTML')
+    try:
+        config_info = (
+            f"🔍 <b>Конфигурация платежей:</b>\n\n"
+            f"Режим: <b>{'TEST' if TELEGRAM_PAYMENTS_TEST else 'LIVE'}</b>\n"
+            f"PROVIDER_TOKEN_TEST: <b>{'установлен' if PROVIDER_TOKEN_TEST else 'НЕ установлен'}</b> "
+            f"({len(PROVIDER_TOKEN_TEST)} символов)\n"
+            f"PROVIDER_TOKEN_LIVE: <b>{'установлен' if PROVIDER_TOKEN_LIVE else 'НЕ установлен'}</b> "
+            f"({len(PROVIDER_TOKEN_LIVE)} символов)\n"
+            f"Текущий provider_token: <b>{'установлен' if provider_token else 'НЕ установлен'}</b> "
+            f"({len(provider_token) if provider_token else 0} символов)\n"
+            f"Валидность токена: <b>{'✅ Валиден' if validate_provider_token(provider_token) else '❌ Невалиден'}</b>\n\n"
+        )
+        
+        if provider_token:
+            config_info += f"Первые 20 символов токена: <code>{provider_token[:20]}...</code>\n"
+            config_info += f"Последние 10 символов токена: <code>...{provider_token[-10:]}</code>\n"
+        
+        logger.info(f"Отправка конфигурации для user_id={user_id}")
+        await message.answer(config_info, parse_mode='HTML')
+        logger.info(f"Конфигурация успешно отправлена для user_id={user_id}")
+        
+    except Exception as e:
+        logger.error(f"Ошибка в check_payment_config_handler для user_id={user_id}: {e}", exc_info=True)
+        await message.answer(
+            f"❌ Ошибка при получении конфигурации: {str(e)}",
+            parse_mode='HTML'
+        )
 
 
 @router.message(Command("subscribe"))
