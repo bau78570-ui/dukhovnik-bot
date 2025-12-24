@@ -6,7 +6,6 @@ import os
 import logging
 from datetime import datetime, timedelta
 from yookassa import Configuration, Payment
-from yookassa.domain.notification import WebhookNotificationFactory
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -255,6 +254,8 @@ def parse_webhook_notification(request_body: dict) -> dict:
     try:
         logger.info(f"Парсинг webhook уведомления от ЮKassa")
         
+        # Ленивый импорт, чтобы избежать проблем при загрузке модуля, если webhook не используется
+        from yookassa.domain.notification import WebhookNotificationFactory
         notification = WebhookNotificationFactory().create(request_body)
         payment_response = notification.object
         
