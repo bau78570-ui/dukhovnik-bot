@@ -255,7 +255,7 @@ def parse_webhook_notification(request_body: dict) -> dict:
         logger.info(f"Парсинг webhook уведомления от ЮKassa")
         
         # Ленивый импорт, чтобы избежать проблем при загрузке модуля, если webhook не используется
-        from yookassa.domain.notification import WebhookNotificationFactory
+        from yookassa.domain.notification import WebhookNotificationFactory  # type: ignore
         notification = WebhookNotificationFactory().create(request_body)
         payment_response = notification.object
         
