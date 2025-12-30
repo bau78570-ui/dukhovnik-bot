@@ -176,9 +176,9 @@ async def subscribe_handler(message: Message, bot: Bot, state: FSMContext):
     
     # Создаем кнопки выбора тарифа
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="1 месяц — 299 руб", callback_data="subscribe_1month")],
-        [InlineKeyboardButton(text="3 месяца — 799 руб (экономия 98 руб)", callback_data="subscribe_3month")],
-        [InlineKeyboardButton(text="Год — 2990 руб (экономия 598 руб)", callback_data="subscribe_12month")]
+        [InlineKeyboardButton(text="1 месяц — 399 руб", callback_data="subscribe_1month")],
+        [InlineKeyboardButton(text="3 месяца — 999 руб (экономия 198 руб)", callback_data="subscribe_3month")],
+        [InlineKeyboardButton(text="Год — 3490 руб (экономия 1298 руб)", callback_data="subscribe_12month")]
     ])
     
     await message.answer("Выберите тариф:", reply_markup=keyboard)
@@ -255,7 +255,7 @@ async def subscribe_1month_handler(callback_query: CallbackQuery, bot: Bot, stat
         return
     
     try:
-        await send_invoice_for_tariff(bot, callback_query.message.chat.id, user_id, "1month", 29900, 30)
+        await send_invoice_for_tariff(bot, callback_query.message.chat.id, user_id, "1month", 39900, 30)
         await callback_query.answer()
     except Exception as e:
         logger.exception(e)
@@ -287,7 +287,7 @@ async def subscribe_3month_handler(callback_query: CallbackQuery, bot: Bot, stat
         return
     
     try:
-        await send_invoice_for_tariff(bot, callback_query.message.chat.id, user_id, "3month", 79900, 90)
+        await send_invoice_for_tariff(bot, callback_query.message.chat.id, user_id, "3month", 99900, 90)
         await callback_query.answer()
     except Exception as e:
         logger.exception(e)
@@ -319,7 +319,7 @@ async def subscribe_12month_handler(callback_query: CallbackQuery, bot: Bot, sta
         return
     
     try:
-        await send_invoice_for_tariff(bot, callback_query.message.chat.id, user_id, "12month", 299000, 365)
+        await send_invoice_for_tariff(bot, callback_query.message.chat.id, user_id, "12month", 349000, 365)
         await callback_query.answer()
     except Exception as e:
         logger.exception(e)
@@ -378,7 +378,7 @@ async def subscribe_callback_handler(callback_query: CallbackQuery, bot: Bot, st
             payload=payload,
             provider_token=provider_token,
             currency="RUB",
-            prices=[LabeledPrice(label="Premium 30 дней", amount=29900)],  # 299 рублей = 29900 копеек
+            prices=[LabeledPrice(label="Premium 30 дней", amount=39900)],  # 399 рублей = 39900 копеек
         )
         
         logger.info(f"Invoice отправлен для user_id={user_id}, payload={payload}")
