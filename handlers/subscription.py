@@ -127,7 +127,7 @@ async def check_payment_config_handler(message: Message, bot: Bot):
 async def subscribe_handler(message: Message, bot: Bot, state: FSMContext):
     """
     Обработчик для команды /subscribe.
-    Отправляет invoice через Telegram Payments с ЮKassa.
+    Отправляет мотивирующее сообщение и кнопки выбора тарифа.
     """
     user_id = message.from_user.id
     
@@ -172,6 +172,8 @@ async def subscribe_handler(message: Message, bot: Bot, state: FSMContext):
         "100% гарантия возврата в 7 дней.\n\n"
         "Оплата безопасно через ЮKassa."
     )
+    
+    logger.info(f"Отправка мотивирующего сообщения для user_id={user_id}")
     await message.answer(motivational_text, parse_mode='HTML')
     
     # Создаем кнопки выбора тарифа
@@ -181,6 +183,7 @@ async def subscribe_handler(message: Message, bot: Bot, state: FSMContext):
         [InlineKeyboardButton(text="Год — 3490 руб (экономия 1298 руб)", callback_data="subscribe_12month")]
     ])
     
+    logger.info(f"Отправка кнопок выбора тарифа для user_id={user_id}")
     await message.answer("Выберите тариф:", reply_markup=keyboard)
 
 
