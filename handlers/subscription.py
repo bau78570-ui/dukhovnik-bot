@@ -229,6 +229,20 @@ async def subscribe_handler(message: Message, bot: Bot, state: FSMContext):
         await message.answer(error_text, parse_mode='HTML')
 
 
+@router.message(Command("status"))
+async def status_handler(message: Message):
+    user_id = message.from_user.id
+    user_data = get_user(user_id)
+    status = user_data.get('status', 'free')
+    end_date = user_data.get('subscription_end_date')
+    if end_date:
+        end_date_str = end_date.strftime('%d.%m.%Y')
+    else:
+        end_date_str = 'нет'
+    text = f"Ваш статус: {status}\nДата окончания: {end_date_str}\n\nИстория платежей: (пока заглушка)"
+    await message.answer(text)
+
+
 @router.callback_query(F.data == "subscribe_premium")
 async def subscribe_callback_handler(callback_query: CallbackQuery, bot: Bot, state: FSMContext):
     """
