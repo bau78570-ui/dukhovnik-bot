@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timedelta
 from aiogram import Router, Bot, F
 from aiogram.filters import Command
-from aiogram.types import Message, PreCheckoutQuery, LabeledPrice, CallbackQuery
+from aiogram.types import Message, PreCheckoutQuery, LabeledPrice, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from dotenv import load_dotenv
 from core.user_database import user_db, get_user
@@ -155,78 +155,33 @@ async def subscribe_handler(message: Message, bot: Bot, state: FSMContext):
     await activate_trial(user_id)
     logger.info(f"Бесплатный период активирован/проверен для user_id={user_id}")
     
-    try:
-        # Отправляем мотивирующее сообщение
-        motivational_text = (
-            "✨ <b>Откройте двери к духовному росту с Premium-подпиской «Духовник»!</b> ✨\n\n"
-            "Представьте: каждый день — как встреча с мудрым православным наставником, который понимает вас с полуслова и всегда поддрежит вас. Тысячи пользователей уже нашли покой и вдохновение!\n\n"
-            "<b>Что вы получите за 399 руб/мес:</b>\n"
-            "💬 <b>Безграничные диалоги с ИИ-Духовником:</b> Ответы на вопросы веры 24/7\n"
-            "📖 <b>Слово Дня с размышлениями:</b> Вдохновение из Библии\n"
-            "🙏 <b>Персональные молитвы:</b> Составьте молитву о здоровье, семье или делах\n"
-            "🗓️ <b>Расширенный календарь:</b> Праздники, посты, именины\n"
-            "⚙️ <b>Уведомления:</b> Утреннее вдохновение и вечерние размышления\n\n"
-            "<b>Отзывы пользователей:</b>\n"
-            "\"Духовник изменил мою жизнь! Теперь каждое утро начинаю с силы.\" — Анна, 5★\n"
-            "\"Наконец-то глубокие ответы без осуждения.\" — Сергей, 5★\n\n"
-            "<b>Специальное предложение:</b> Первые 3 дня бесплатно! Подпишитесь сейчас — и получите бонус: эксклюзивную молитву на успех.\n\n"
-            "Нажмите «Оплатить» ниже. 100% гарантия возврата в 7 дней.\n\n"
-            "Оплата безопасно через ЮKassa."
-        )
-        await message.answer(motivational_text, parse_mode='HTML')
-        
-        # Формируем payload с уникальным идентификатором
-        payload = f"premium_30_days_{user_id}_{int(datetime.now().timestamp())}"
-        
-        logger.info(f"Попытка отправить invoice пользователю {user_id}. Режим: {'TEST' if TELEGRAM_PAYMENTS_TEST else 'LIVE'}, provider_token (первые 15 символов): {provider_token[:15] if provider_token else 'None'}..., длина токена: {len(provider_token) if provider_token else 0}")
-        logger.info(f"Chat ID: {message.chat.id}, Payload: {payload}")
-        
-        # Отправляем invoice
-        invoice_result = await bot.send_invoice(
-            chat_id=message.chat.id,
-            title="Premium «Духовник» на 30 дней",
-            description="Безграничный доступ к AI-собеседнику, Слову дня и молитвам",
-            payload=payload,
-            provider_token=provider_token,
-            currency="RUB",
-            prices=[LabeledPrice(label="Premium 30 дней", amount=29900)],  # 299 рублей = 29900 копеек
-        )
-        
-        logger.info(f"Invoice успешно отправлен для user_id={user_id}, payload={payload}, message_id={invoice_result.message_id}")
-        
-    except Exception as e:
-        error_message = str(e)
-        error_type = type(e).__name__
-        logger.exception(e)
-        
-        # Более детальное сообщение об ошибке для отладки
-        if "provider_token" in error_message.lower() or "invalid" in error_message.lower() or "bad request" in error_message.lower():
-            error_text = (
-                "❌ <b>Ошибка при создании платежа.</b>\n\n"
-                "Проблема с настройкой платежного провайдера.\n\n"
-                "<b>Возможные причины:</b>\n"
-                "• Токен неверный или устарел\n"
-                "• Бот не подключен к ЮKassa через @BotFather\n"
-                "• Магазин не работает на протоколе API\n\n"
-                f"Тип ошибки: {error_type}\n\n"
-                "Проверьте настройки через команду /check_payment_config\n"
-                "Инструкция: https://yookassa.ru/docs/support/payments/onboarding/integration/cms-module/telegram"
-            )
-        elif "unauthorized" in error_message.lower() or "401" in error_message.lower():
-            error_text = (
-                "❌ <b>Ошибка авторизации.</b>\n\n"
-                "Токен платежного провайдера неверный или истек срок действия.\n\n"
-                f"Тип ошибки: {error_type}\n\n"
-                "Проверьте токен через @BotFather → Payments"
-            )
-        else:
-            error_text = (
-                "❌ <b>Произошла ошибка при создании платежа.</b>\n\n"
-                f"Тип ошибки: {error_type}\n\n"
-                "Пожалуйста, попробуйте позже или обратитесь в поддержку: /support"
-            )
-        
-        await message.answer(error_text, parse_mode='HTML')
+    # Отправляем мотивирующее сообщение
+    motivational_text = (
+        "✨ <b>Откройте двери к духовному росту с Premium-подпиской «Духовник»!</b> ✨\n\n"
+        "Представьте: каждый день — как встреча с мудрым православным наставником, который понимает вас с полуслова и всегда поддрежит вас. Тысячи пользователей уже нашли покой и вдохновение!\n\n"
+        "<b>Что вы получите за 399 руб/мес:</b>\n"
+        "💬 <b>Безграничные диалоги с ИИ-Духовником:</b> Ответы на вопросы веры 24/7\n"
+        "📖 <b>Слово Дня с размышлениями:</b> Вдохновение из Библии\n"
+        "🙏 <b>Персональные молитвы:</b> Составьте молитву о здоровье, семье или делах\n"
+        "🗓️ <b>Расширенный календарь:</b> Праздники, посты, именины\n"
+        "⚙️ <b>Уведомления:</b> Утреннее вдохновение и вечерние размышления\n\n"
+        "<b>Отзывы пользователей:</b>\n"
+        "\"Духовник изменил мою жизнь! Теперь каждое утро начинаю с силы.\" — Анна, 5★\n"
+        "\"Наконец-то глубокие ответы без осуждения.\" — Сергей, 5★\n\n"
+        "<b>Специальное предложение:</b> Первые 3 дня бесплатно! Подпишитесь сейчас — и получите бонус: эксклюзивную молитву на успех.\n\n"
+        "100% гарантия возврата в 7 дней.\n\n"
+        "Оплата безопасно через ЮKassa."
+    )
+    await message.answer(motivational_text, parse_mode='HTML')
+    
+    # Создаем кнопки выбора тарифа
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="1 месяц — 299 руб", callback_data="subscribe_1month")],
+        [InlineKeyboardButton(text="3 месяца — 799 руб (экономия 98 руб)", callback_data="subscribe_3month")],
+        [InlineKeyboardButton(text="Год — 2990 руб (экономия 598 руб)", callback_data="subscribe_12month")]
+    ])
+    
+    await message.answer("Выберите тариф:", reply_markup=keyboard)
 
 
 @router.message(Command("status"))
@@ -241,6 +196,139 @@ async def status_handler(message: Message):
         end_date_str = 'нет'
     text = f"Ваш статус: {status}\nДата окончания: {end_date_str}\n\nИстория платежей: (пока заглушка)"
     await message.answer(text)
+
+
+async def send_invoice_for_tariff(bot: Bot, chat_id: int, user_id: int, tariff: str, amount: int, days: int):
+    """
+    Вспомогательная функция для отправки invoice для выбранного тарифа.
+    """
+    # Формируем payload с информацией о тарифе и днях
+    payload = f"premium_{days}_days_{user_id}_{int(datetime.now().timestamp())}"
+    
+    # Определяем название тарифа
+    if days == 30:
+        title = "Premium «Духовник» на 1 месяц"
+        label = "Premium 1 месяц"
+    elif days == 90:
+        title = "Premium «Духовник» на 3 месяца"
+        label = "Premium 3 месяца"
+    elif days == 365:
+        title = "Premium «Духовник» на 1 год"
+        label = "Premium 1 год"
+    else:
+        title = f"Premium «Духовник» на {days} дней"
+        label = f"Premium {days} дней"
+    
+    logger.info(f"Попытка отправить invoice для тарифа {tariff} пользователю {user_id}. Режим: {'TEST' if TELEGRAM_PAYMENTS_TEST else 'LIVE'}, amount={amount}, days={days}")
+    
+    # Отправляем invoice
+    await bot.send_invoice(
+        chat_id=chat_id,
+        title=title,
+        description="Безграничный доступ к AI-собеседнику, Слову дня и молитвам",
+        payload=payload,
+        provider_token=provider_token,
+        currency="RUB",
+        prices=[LabeledPrice(label=label, amount=amount)],
+    )
+    
+    logger.info(f"Invoice отправлен для user_id={user_id}, payload={payload}, tariff={tariff}")
+
+
+@router.callback_query(F.data == "subscribe_1month")
+async def subscribe_1month_handler(callback_query: CallbackQuery, bot: Bot, state: FSMContext):
+    """
+    Обработчик для тарифа "1 месяц".
+    """
+    user_id = callback_query.from_user.id
+    
+    logger.info(f"Выбран тариф 1 месяц от user_id={user_id}")
+    
+    # Проверяем наличие provider_token
+    if not validate_provider_token(provider_token):
+        await callback_query.message.answer(
+            "❌ <b>Ошибка конфигурации платежей.</b>\n\n"
+            "Платежная система не настроена.",
+            parse_mode='HTML'
+        )
+        await callback_query.answer()
+        return
+    
+    try:
+        await send_invoice_for_tariff(bot, callback_query.message.chat.id, user_id, "1month", 29900, 30)
+        await callback_query.answer()
+    except Exception as e:
+        logger.exception(e)
+        await callback_query.message.answer(
+            "❌ <b>Произошла ошибка при создании платежа.</b>\n\n"
+            "Пожалуйста, попробуйте позже или обратитесь в поддержку: /support",
+            parse_mode='HTML'
+        )
+        await callback_query.answer()
+
+
+@router.callback_query(F.data == "subscribe_3month")
+async def subscribe_3month_handler(callback_query: CallbackQuery, bot: Bot, state: FSMContext):
+    """
+    Обработчик для тарифа "3 месяца".
+    """
+    user_id = callback_query.from_user.id
+    
+    logger.info(f"Выбран тариф 3 месяца от user_id={user_id}")
+    
+    # Проверяем наличие provider_token
+    if not validate_provider_token(provider_token):
+        await callback_query.message.answer(
+            "❌ <b>Ошибка конфигурации платежей.</b>\n\n"
+            "Платежная система не настроена.",
+            parse_mode='HTML'
+        )
+        await callback_query.answer()
+        return
+    
+    try:
+        await send_invoice_for_tariff(bot, callback_query.message.chat.id, user_id, "3month", 79900, 90)
+        await callback_query.answer()
+    except Exception as e:
+        logger.exception(e)
+        await callback_query.message.answer(
+            "❌ <b>Произошла ошибка при создании платежа.</b>\n\n"
+            "Пожалуйста, попробуйте позже или обратитесь в поддержку: /support",
+            parse_mode='HTML'
+        )
+        await callback_query.answer()
+
+
+@router.callback_query(F.data == "subscribe_12month")
+async def subscribe_12month_handler(callback_query: CallbackQuery, bot: Bot, state: FSMContext):
+    """
+    Обработчик для тарифа "12 месяцев".
+    """
+    user_id = callback_query.from_user.id
+    
+    logger.info(f"Выбран тариф 12 месяцев от user_id={user_id}")
+    
+    # Проверяем наличие provider_token
+    if not validate_provider_token(provider_token):
+        await callback_query.message.answer(
+            "❌ <b>Ошибка конфигурации платежей.</b>\n\n"
+            "Платежная система не настроена.",
+            parse_mode='HTML'
+        )
+        await callback_query.answer()
+        return
+    
+    try:
+        await send_invoice_for_tariff(bot, callback_query.message.chat.id, user_id, "12month", 299000, 365)
+        await callback_query.answer()
+    except Exception as e:
+        logger.exception(e)
+        await callback_query.message.answer(
+            "❌ <b>Произошла ошибка при создании платежа.</b>\n\n"
+            "Пожалуйста, попробуйте позже или обратитесь в поддержку: /support",
+            parse_mode='HTML'
+        )
+        await callback_query.answer()
 
 
 @router.callback_query(F.data == "subscribe_premium")
@@ -366,27 +454,50 @@ async def pre_checkout_handler(query: PreCheckoutQuery, bot: Bot):
 async def successful_payment_handler(message: Message, bot: Bot):
     """
     Обработчик успешного платежа.
-    Активирует Premium подписку на 30 дней.
+    Активирует Premium подписку на указанное количество дней из payload.
     """
     user_id = message.from_user.id
     payment_info = message.successful_payment
+    payload = payment_info.invoice_payload
     
-    logger.info(f"Оплата прошла для user_id={user_id}, invoice_payload={payment_info.invoice_payload}, total_amount={payment_info.total_amount}")
+    logger.info(f"Оплата прошла для user_id={user_id}, invoice_payload={payload}, total_amount={payment_info.total_amount}")
     
     try:
-        # Активируем Premium подписку на 30 дней
-        success = await activate_premium_subscription(user_id, duration_days=30)
+        # Парсим количество дней из payload
+        # Формат: premium_{days}_days_{user_id}_{timestamp}
+        days = 30  # значение по умолчанию
+        try:
+            # Извлекаем days из payload
+            parts = payload.split('_')
+            if len(parts) >= 2 and parts[0] == 'premium':
+                days = int(parts[1])
+                logger.info(f"Извлечено количество дней из payload: {days}")
+        except (ValueError, IndexError) as e:
+            logger.warning(f"Не удалось извлечь количество дней из payload '{payload}': {e}. Используется значение по умолчанию: 30")
+        
+        # Активируем Premium подписку на указанное количество дней
+        success = await activate_premium_subscription(user_id, duration_days=days)
         
         if success:
             # Обновляем статус в user_db
             user_data = get_user(user_id)
-            user_data['subscription_end_date'] = datetime.now() + timedelta(days=30)
+            user_data['subscription_end_date'] = datetime.now() + timedelta(days=days)
             user_data['status'] = 'active'
             
-            logger.info(f"Premium подписка успешно активирована для user_id={user_id}")
+            # Формируем сообщение в зависимости от количества дней
+            if days == 30:
+                period_text = "1 месяц"
+            elif days == 90:
+                period_text = "3 месяца"
+            elif days == 365:
+                period_text = "1 год"
+            else:
+                period_text = f"{days} дней"
+            
+            logger.info(f"Premium подписка успешно активирована для user_id={user_id} на {days} дней")
             
             await message.answer(
-                "🎉 <b>Оплата прошла! Premium активирован на 30 дней!</b> 🎉\n\n"
+                f"🎉 <b>Оплата прошла! Premium активирован на {period_text}!</b> 🎉\n\n"
                 "Теперь у вас есть доступ ко всем Premium функциям:\n"
                 "💬 Безграничные диалоги с AI-Собеседником\n"
                 "📖 Ежедневное «Слово Дня» с AI-размышлением\n"
