@@ -186,16 +186,49 @@ async def subscribe_handler(message: Message, bot: Bot, state: FSMContext):
 
 @router.message(Command("status"))
 async def status_handler(message: Message):
+    """
+    Команда для просмотра статуса подписки и истории платежей.
+    """
     user_id = message.from_user.id
-    user_data = get_user(user_id)
-    status = user_data.get('status', 'free')
-    end_date = user_data.get('subscription_end_date')
-    if end_date:
-        end_date_str = end_date.strftime('%d.%m.%Y')
-    else:
-        end_date_str = 'нет'
-    text = f"Ваш статус: {status}\nДата окончания: {end_date_str}\n\nИстория платежей: (пока заглушка)"
-    await message.answer(text)
+    
+    logger.info(f"Команда /status от user_id={user_id}")
+    
+    try:
+        user_data = get_user(user_id)
+        status = user_data.get('status', 'free')
+        end_date = user_data.get('subscription_end_date')
+        
+        if end_date:
+            end_date_str = end_date.strftime('%d.%m.%Y')
+        else:
+            end_date_str = 'нет'
+        
+        # Получаем историю платежей
+        payments = user_data.get('payments', [])
+        if payments:
+            payments_text = "\n".join([
+                f"• {payment.get('date', 'Неизвестно')} — {payment.get('amount', 0) / 100:.2f} руб ({payment.get('period', 'N/A')})"
+                for payment in payments
+            ])
+        else:
+            payments_text = 'нет'
+        
+        text = (
+            f"Ваш статус: {status}\n"
+            f"Дата окончания: {end_date_str}\n\n"
+            f"История платежей:\n{payments_text}"
+        )
+        
+        logger.info(f"Статус отправлен для user_id={user_id}: status={status}, payments_count={len(payments) if payments else 0}")
+        await message.answer(text)
+        
+    except Exception as e:
+        logger.error(f"Ошибка при получении статуса для user_id={user_id}: {e}", exc_info=True)
+        await message.answer(
+            "❌ <b>Произошла ошибка при получении статуса.</b>\n\n"
+            "Пожалуйста, попробуйте позже или обратитесь в поддержку: /support",
+            parse_mode='HTML'
+        )
 
 
 async def send_invoice_for_tariff(bot: Bot, chat_id: int, user_id: int, tariff: str, amount: int, days: int):
@@ -221,7 +254,7 @@ async def send_invoice_for_tariff(bot: Bot, chat_id: int, user_id: int, tariff: 
     
     logger.info(f"Попытка отправить invoice для тарифа {tariff} пользователю {user_id}. Режим: {'TEST' if TELEGRAM_PAYMENTS_TEST else 'LIVE'}, amount={amount}, days={days}")
     
-    # Отправляем invoice
+    # Отправляем invoice с автопродлением
     await bot.send_invoice(
         chat_id=chat_id,
         title=title,
@@ -230,6 +263,8 @@ async def send_invoice_for_tariff(bot: Bot, chat_id: int, user_id: int, tariff: 
         provider_token=provider_token,
         currency="RUB",
         prices=[LabeledPrice(label=label, amount=amount)],
+        recurring=True,
+        max_tip_amount=0
     )
     
     logger.info(f"Invoice отправлен для user_id={user_id}, payload={payload}, tariff={tariff}")
@@ -370,7 +405,7 @@ async def subscribe_callback_handler(callback_query: CallbackQuery, bot: Bot, st
         
         logger.info(f"Попытка отправить invoice пользователю {user_id}. Режим: {'TEST' if TELEGRAM_PAYMENTS_TEST else 'LIVE'}, provider_token (первые 15 символов): {provider_token[:15] if provider_token else 'None'}..., длина токена: {len(provider_token) if provider_token else 0}")
         
-        # Отправляем invoice
+        # Отправляем invoice с автопродлением
         await bot.send_invoice(
             chat_id=callback_query.message.chat.id,
             title="Premium «Духовник» на 30 дней",
@@ -379,6 +414,8 @@ async def subscribe_callback_handler(callback_query: CallbackQuery, bot: Bot, st
             provider_token=provider_token,
             currency="RUB",
             prices=[LabeledPrice(label="Premium 30 дней", amount=39900)],  # 399 рублей = 39900 копеек
+            recurring=True,
+            max_tip_amount=0
         )
         
         logger.info(f"Invoice отправлен для user_id={user_id}, payload={payload}")
@@ -484,7 +521,11 @@ async def successful_payment_handler(message: Message, bot: Bot):
             user_data['subscription_end_date'] = datetime.now() + timedelta(days=days)
             user_data['status'] = 'active'
             
-            # Формируем сообщение в зависимости от количества дней
+            # Сохраняем информацию о платеже в историю
+            if 'payments' not in user_data:
+                user_data['payments'] = []
+            
+            # Формируем текст периода для истории
             if days == 30:
                 period_text = "1 месяц"
             elif days == 90:
@@ -494,7 +535,15 @@ async def successful_payment_handler(message: Message, bot: Bot):
             else:
                 period_text = f"{days} дней"
             
-            logger.info(f"Premium подписка успешно активирована для user_id={user_id} на {days} дней")
+            payment_record = {
+                'date': datetime.now().strftime('%d.%m.%Y %H:%M'),
+                'amount': payment_info.total_amount,
+                'period': period_text,
+                'payload': payload
+            }
+            user_data['payments'].append(payment_record)
+            
+            logger.info(f"Premium подписка успешно активирована для user_id={user_id} на {days} дней. Платеж сохранен в историю.")
             
             await message.answer(
                 f"🎉 <b>Оплата прошла! Premium активирован на {period_text}!</b> 🎉\n\n"
@@ -520,6 +569,107 @@ async def successful_payment_handler(message: Message, bot: Bot):
         await message.answer(
             "❌ <b>Произошла ошибка при обработке платежа.</b>\n\n"
             "Пожалуйста, обратитесь в поддержку: /support",
+            parse_mode='HTML'
+        )
+
+
+@router.message(F.recurring_payment)
+async def recurring_payment_handler(message: Message, bot: Bot):
+    """
+    Обработчик автопродления подписки.
+    Продлевает подписку на 30 дней автоматически.
+    """
+    user_id = message.from_user.id
+    recurring_payment = message.recurring_payment
+    
+    logger.info(f"Автопродление для user_id={user_id}, invoice_payload={recurring_payment.invoice_payload}, total_amount={recurring_payment.total_amount}")
+    
+    try:
+        # Продлеваем подписку на 30 дней
+        days = 30
+        success = await activate_premium_subscription(user_id, duration_days=days)
+        
+        if success:
+            # Обновляем статус в user_db
+            user_data = get_user(user_id)
+            current_end_date = user_data.get('subscription_end_date')
+            
+            # Если подписка уже активна, продлеваем от текущей даты окончания, иначе от текущей даты
+            if current_end_date and current_end_date > datetime.now():
+                user_data['subscription_end_date'] = current_end_date + timedelta(days=days)
+            else:
+                user_data['subscription_end_date'] = datetime.now() + timedelta(days=days)
+            
+            user_data['status'] = 'active'
+            
+            # Сохраняем информацию о платеже автопродления в историю
+            if 'payments' not in user_data:
+                user_data['payments'] = []
+            
+            payment_record = {
+                'date': datetime.now().strftime('%d.%m.%Y %H:%M'),
+                'amount': recurring_payment.total_amount,
+                'period': '1 месяц (автопродление)',
+                'payload': recurring_payment.invoice_payload
+            }
+            user_data['payments'].append(payment_record)
+            
+            logger.info(f"Автопродление успешно выполнено для user_id={user_id}. Подписка продлена на {days} дней.")
+            
+            await message.answer(
+                "🔄 <b>Подписка автоматически продлена на 1 месяц!</b> 🔄\n\n"
+                "Ваша Premium подписка продолжает действовать.\n\n"
+                "Спасибо за доверие! 🙏",
+                parse_mode='HTML'
+            )
+        else:
+            logger.error(f"Ошибка при автопродлении подписки для user_id={user_id}")
+            await message.answer(
+                "❌ <b>Произошла ошибка при автопродлении подписки.</b>\n\n"
+                "Пожалуйста, обратитесь в поддержку: /support",
+                parse_mode='HTML'
+            )
+            
+    except Exception as e:
+        logger.error(f"Ошибка при обработке автопродления для user_id={user_id}: {e}", exc_info=True)
+        await message.answer(
+            "❌ <b>Произошла ошибка при обработке автопродления.</b>\n\n"
+            "Пожалуйста, обратитесь в поддержку: /support",
+            parse_mode='HTML'
+        )
+
+
+@router.message(Command("cancel_subscription"))
+async def cancel_subscription_handler(message: Message):
+    """
+    Команда для отмены подписки.
+    Меняет статус на 'canceled'.
+    """
+    user_id = message.from_user.id
+    
+    logger.info(f"Команда /cancel_subscription от user_id={user_id}")
+    
+    try:
+        user_data = get_user(user_id)
+        current_status = user_data.get('status', 'free')
+        
+        if current_status == 'canceled':
+            await message.answer("Подписка уже отменена.")
+            logger.info(f"Попытка отменить уже отмененную подписку для user_id={user_id}")
+            return
+        
+        # Меняем статус на 'canceled'
+        user_data['status'] = 'canceled'
+        
+        logger.info(f"Подписка отменена для user_id={user_id}. Предыдущий статус: {current_status}")
+        
+        await message.answer("Подписка отменена.")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при отмене подписки для user_id={user_id}: {e}", exc_info=True)
+        await message.answer(
+            "❌ <b>Произошла ошибка при отмене подписки.</b>\n\n"
+            "Пожалуйста, попробуйте позже или обратитесь в поддержку: /support",
             parse_mode='HTML'
         )
 
