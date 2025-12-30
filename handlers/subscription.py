@@ -159,8 +159,7 @@ async def subscribe_handler(message: Message, bot: Bot, state: FSMContext):
         # Формируем payload с уникальным идентификатором
         payload = f"premium_30_days_{user_id}_{int(datetime.now().timestamp())}"
         
-        logger.info(f"Отправка invoice для user_id={user_id}")
-        logger.info(f"Provider token (первые 15 символов): {provider_token[:15]}..., длина: {len(provider_token)}")
+        logger.info(f"Попытка отправить invoice пользователю {user_id}. Режим: {'TEST' if TELEGRAM_PAYMENTS_TEST else 'LIVE'}, provider_token (первые 15 символов): {provider_token[:15] if provider_token else 'None'}..., длина токена: {len(provider_token) if provider_token else 0}")
         logger.info(f"Chat ID: {message.chat.id}, Payload: {payload}")
         
         # Отправляем invoice
@@ -179,11 +178,7 @@ async def subscribe_handler(message: Message, bot: Bot, state: FSMContext):
     except Exception as e:
         error_message = str(e)
         error_type = type(e).__name__
-        logger.error(f"ОШИБКА при отправке invoice для user_id={user_id}")
-        logger.error(f"Тип ошибки: {error_type}")
-        logger.error(f"Сообщение ошибки: {error_message}")
-        logger.error(f"Provider token (первые 15 символов): {provider_token[:15] if provider_token else 'НЕТ ТОКЕНА'}...")
-        logger.error(f"Полная информация об ошибке:", exc_info=True)
+        logger.exception(e)
         
         # Более детальное сообщение об ошибке для отладки
         if "provider_token" in error_message.lower() or "invalid" in error_message.lower() or "bad request" in error_message.lower():
@@ -194,6 +189,7 @@ async def subscribe_handler(message: Message, bot: Bot, state: FSMContext):
                 "• Токен неверный или устарел\n"
                 "• Бот не подключен к ЮKassa через @BotFather\n"
                 "• Магазин не работает на протоколе API\n\n"
+                f"Тип ошибки: {error_type}\n\n"
                 "Проверьте настройки через команду /check_payment_config\n"
                 "Инструкция: https://yookassa.ru/docs/support/payments/onboarding/integration/cms-module/telegram"
             )
@@ -201,6 +197,7 @@ async def subscribe_handler(message: Message, bot: Bot, state: FSMContext):
             error_text = (
                 "❌ <b>Ошибка авторизации.</b>\n\n"
                 "Токен платежного провайдера неверный или истек срок действия.\n\n"
+                f"Тип ошибки: {error_type}\n\n"
                 "Проверьте токен через @BotFather → Payments"
             )
         else:
@@ -250,7 +247,7 @@ async def subscribe_callback_handler(callback_query: CallbackQuery, bot: Bot, st
         # Формируем payload с уникальным идентификатором
         payload = f"premium_30_days_{user_id}_{int(datetime.now().timestamp())}"
         
-        logger.info(f"Отправка invoice для user_id={user_id}, provider_token (первые 10 символов): {provider_token[:10]}...")
+        logger.info(f"Попытка отправить invoice пользователю {user_id}. Режим: {'TEST' if TELEGRAM_PAYMENTS_TEST else 'LIVE'}, provider_token (первые 15 символов): {provider_token[:15] if provider_token else 'None'}..., длина токена: {len(provider_token) if provider_token else 0}")
         
         # Отправляем invoice
         await bot.send_invoice(
@@ -269,11 +266,7 @@ async def subscribe_callback_handler(callback_query: CallbackQuery, bot: Bot, st
     except Exception as e:
         error_message = str(e)
         error_type = type(e).__name__
-        logger.error(f"ОШИБКА при отправке invoice для user_id={user_id}")
-        logger.error(f"Тип ошибки: {error_type}")
-        logger.error(f"Сообщение ошибки: {error_message}")
-        logger.error(f"Provider token (первые 15 символов): {provider_token[:15] if provider_token else 'НЕТ ТОКЕНА'}...")
-        logger.error(f"Полная информация об ошибке:", exc_info=True)
+        logger.exception(e)
         
         # Более детальное сообщение об ошибке для отладки
         if "provider_token" in error_message.lower() or "invalid" in error_message.lower() or "bad request" in error_message.lower():
@@ -284,6 +277,7 @@ async def subscribe_callback_handler(callback_query: CallbackQuery, bot: Bot, st
                 "• Токен неверный или устарел\n"
                 "• Бот не подключен к ЮKassa через @BotFather\n"
                 "• Магазин не работает на протоколе API\n\n"
+                f"Тип ошибки: {error_type}\n\n"
                 "Проверьте настройки через команду /check_payment_config\n"
                 "Инструкция: https://yookassa.ru/docs/support/payments/onboarding/integration/cms-module/telegram"
             )
@@ -291,6 +285,7 @@ async def subscribe_callback_handler(callback_query: CallbackQuery, bot: Bot, st
             error_text = (
                 "❌ <b>Ошибка авторизации.</b>\n\n"
                 "Токен платежного провайдера неверный или истек срок действия.\n\n"
+                f"Тип ошибки: {error_type}\n\n"
                 "Проверьте токен через @BotFather → Payments"
             )
         else:
@@ -383,4 +378,7 @@ async def successful_payment_handler(message: Message, bot: Bot):
             "Пожалуйста, обратитесь в поддержку: /support",
             parse_mode='HTML'
         )
+
+
+__all__ = ["router"]
 
