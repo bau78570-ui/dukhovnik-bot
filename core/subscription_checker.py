@@ -218,7 +218,11 @@ class AccessCheckerMiddleware(BaseMiddleware):
             print("--- Access Check Finished ---\n")
             return await handler(event, data)
         else:
-            # Пробный период был активирован ранее, но истек
+            # Пробный период был активирован ранее, но истек - устанавливаем статус 'expired'
+            if user_data.get('status') == 'free':
+                user_data['status'] = 'expired'
+                logging.info(f"Пробный период истёк для user_id {user_id}, статус установлен на 'expired'")
+            
             print("RESULT: Trial period was activated previously but has expired. Access DENIED.")
             print("--- Access Check Finished ---\n")
             no_access_text = (
