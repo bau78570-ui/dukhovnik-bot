@@ -98,11 +98,16 @@ async def is_subscription_active(user_id: int) -> bool:
     """
     Проверяет активность платной подписки пользователя.
     Проверяет наличие и валидность subscription_end_date в базе данных пользователя.
-    Также проверяет пробный период: если пробный период истек, устанавливает статус 'expired' и возвращает False.
+    
+    ВАЖНО: Эта функция проверяет ТОЛЬКО платные подписки, не пробные периоды.
+    Для проверки пробного периода используйте функцию is_trial_active().
+    
+    Returns:
+        bool: True если у пользователя есть активная платная подписка, False в противном случае
     """
     user_data = get_user(user_id)
     
-    # Сначала проверяем платную подписку
+    # Проверяем платную подписку
     subscription_end = user_data.get('subscription_end_date')
     if subscription_end:
         # Если subscription_end_date - это datetime, проверяем, не истекла ли подписка
@@ -120,30 +125,7 @@ async def is_subscription_active(user_id: int) -> bool:
             except (ValueError, TypeError):
                 pass
     
-    # Если платной подписки нет или она истекла, проверяем пробный период
-    # ВАЖНО: Пробный период проверяется ТОЛЬКО если платной подписки нет
-    trial_start_date = user_data.get('trial_start_date')
-    if trial_start_date:
-        # Пробный период был активирован - проверяем, не истек ли он
-        if isinstance(trial_start_date, str):
-            try:
-                trial_start_date = datetime.fromisoformat(trial_start_date)
-            except (ValueError, TypeError):
-                return False
-        
-        if isinstance(trial_start_date, datetime):
-            trial_end_date = trial_start_date + timedelta(days=TRIAL_DURATION_DAYS)
-            if datetime.now() >= trial_end_date:
-                # Пробный период истёк - устанавливаем статус 'expired'
-                user_data['status'] = 'expired'
-                logging.info(f"Пробный период истёк для user_id {user_id}, статус установлен на 'expired'")
-                return False
-            else:
-                # Пробный период еще активен
-                logging.info(f"Пробный период активен для user_id {user_id}")
-                return True
-    
-    # Если нет ни платной подписки, ни активного пробного периода
+    # Если платной подписки нет или она истекла, возвращаем False
     return False
 
 async def is_premium(user_id: int) -> bool:
@@ -218,7 +200,11 @@ class AccessCheckerMiddleware(BaseMiddleware):
             print("--- Access Check Finished ---\n")
             return await handler(event, data)
         else:
-            # Пробный период был активирован ранее, но истек
+            # Пробный период был активирован ранее, но истек - устанавливаем статус 'expired'
+            if user_data.get('status') == 'free':
+                user_data['status'] = 'expired'
+                logging.info(f"Пробный период истёк для user_id {user_id}, статус установлен на 'expired'")
+            
             print("RESULT: Trial period was activated previously but has expired. Access DENIED.")
             print("--- Access Check Finished ---\n")
             no_access_text = (
