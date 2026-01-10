@@ -151,9 +151,9 @@ async def subscribe_handler(message: Message, bot: Bot, state: FSMContext):
         )
         return
     
-    # Активируем бесплатный период, если он еще не был активирован
-    await activate_trial(user_id)
-    logger.info(f"Бесплатный период активирован/проверен для user_id={user_id}")
+    # Не активируем пробный период в /subscribe - он активируется автоматически через middleware при первом использовании
+    # При /subscribe пользователь должен выбрать тариф и оплатить подписку
+    logger.info(f"Команда /subscribe обработана для user_id={user_id}")
     
     # Отправляем мотивирующее сообщение
     motivational_text = (
@@ -395,9 +395,9 @@ async def subscribe_callback_handler(callback_query: CallbackQuery, bot: Bot, st
         await callback_query.answer()
         return
     
-    # Активируем бесплатный период, если он еще не был активирован
-    await activate_trial(user_id)
-    logger.info(f"Бесплатный период активирован/проверен для user_id={user_id}")
+    # Не активируем пробный период в старом обработчике - он активируется автоматически через middleware
+    # При выборе тарифа пользователь должен оплатить подписку
+    logger.info(f"Кнопка 'Оформить Premium' обработана для user_id={user_id}")
     
     try:
         # Формируем payload с уникальным идентификатором

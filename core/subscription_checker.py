@@ -27,15 +27,25 @@ async def activate_trial(user_id: int) -> bool:
     """
     Активирует пробный период для пользователя, если он еще не был активирован.
     Возвращает True, если пробный период активирован или уже активен, False в противном случае.
+    НЕ активирует повторно, если пробный период уже был активирован ранее (даже если истек).
     """
     user_data = get_user(user_id)
-    if user_data.get('trial_start_date'):
-        # Пробный период уже был активирован
-        return await is_trial_active(user_id)
+    trial_start = user_data.get('trial_start_date')
     
+    if trial_start is not None:
+        # Пробный период уже был активирован - проверяем, активен ли он еще
+        is_active = await is_trial_active(user_id)
+        if not is_active:
+            # Пробный период истек - убеждаемся, что статус установлен правильно
+            if user_data.get('status') == 'free':
+                user_data['status'] = 'expired'
+                logging.info(f"Пробный период истек для user_id={user_id}, статус установлен на 'expired'")
+        return is_active
+    
+    # Пробный период еще не был активирован - активируем его
     user_data['trial_start_date'] = datetime.now()
     user_data['status'] = 'free'
-    # TODO: Сохранить user_db в постоянное хранилище
+    logging.info(f"Пробный период активирован для user_id={user_id} на {TRIAL_DURATION_DAYS} дней")
     return True
 
 async def activate_premium_subscription(user_id: int, duration_days: int = 30) -> bool:
@@ -88,41 +98,48 @@ async def is_subscription_active(user_id: int) -> bool:
     """
     Проверяет активность платной подписки пользователя.
     Проверяет наличие и валидность subscription_end_date в базе данных пользователя.
-    Также проверяет пробный период: если trial_start_date + 3 days < datetime.now() и status == 'free' → возвращает False.
+    Также проверяет пробный период: если пробный период истек, устанавливает статус 'expired' и возвращает False.
     """
     user_data = get_user(user_id)
     
-    # Проверка пробного периода: если истёк и status == 'free', отключаем доступ
-    trial_start_date = user_data.get('trial_start_date')
-    status = user_data.get('status')
-    
-    if trial_start_date and status == 'free':
-        if isinstance(trial_start_date, str):
-            try:
-                trial_start_date = datetime.fromisoformat(trial_start_date)
-            except (ValueError, TypeError):
-                pass
-        
-        if isinstance(trial_start_date, datetime):
-            trial_end_date = trial_start_date + timedelta(days=TRIAL_DURATION_DAYS)
-            if datetime.now() >= trial_end_date:
-                # Пробный период истёк
-                user_data['status'] = 'expired'
-                logging.info(f"Пробный период истёк для user_id {user_id}")
-                return False
-    
+    # Сначала проверяем платную подписку
     subscription_end = user_data.get('subscription_end_date')
     if subscription_end:
         # Если subscription_end_date - это datetime, проверяем, не истекла ли подписка
         if isinstance(subscription_end, datetime):
-            return datetime.now() < subscription_end
+            if datetime.now() < subscription_end:
+                # Платная подписка активна
+                return True
         # Если это строка, пытаемся распарсить
         elif isinstance(subscription_end, str):
             try:
                 end_date = datetime.fromisoformat(subscription_end)
-                return datetime.now() < end_date
+                if datetime.now() < end_date:
+                    # Платная подписка активна
+                    return True
+            except (ValueError, TypeError):
+                pass
+    
+    # Если платной подписки нет или она истекла, проверяем пробный период
+    # ВАЖНО: Пробный период проверяется ТОЛЬКО если платной подписки нет
+    trial_start_date = user_data.get('trial_start_date')
+    if trial_start_date:
+        # Пробный период был активирован - проверяем, не истек ли он
+        if isinstance(trial_start_date, str):
+            try:
+                trial_start_date = datetime.fromisoformat(trial_start_date)
             except (ValueError, TypeError):
                 return False
+        
+        if isinstance(trial_start_date, datetime):
+            trial_end_date = trial_start_date + timedelta(days=TRIAL_DURATION_DAYS)
+            if datetime.now() >= trial_end_date:
+                # Пробный период истёк - устанавливаем статус 'expired'
+                user_data['status'] = 'expired'
+                logging.info(f"Пробный период истёк для user_id {user_id}, статус установлен на 'expired'")
+                return False
+    
+    # Если нет ни платной подписки, ни активного пробного периода
     return False
 
 async def is_premium(user_id: int) -> bool:
