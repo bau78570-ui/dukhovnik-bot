@@ -256,7 +256,7 @@ async def send_invoice_for_tariff(bot: Bot, chat_id: int, user_id: int, tariff: 
     
     logger.info(f"Попытка отправить invoice для тарифа {tariff} пользователю {user_id}. Режим: {'TEST' if TELEGRAM_PAYMENTS_TEST else 'LIVE'}, amount={amount}, days={days}")
     
-    # Отправляем invoice с автопродлением
+    # Отправляем invoice
     await bot.send_invoice(
         chat_id=chat_id,
         title=title,
@@ -264,9 +264,7 @@ async def send_invoice_for_tariff(bot: Bot, chat_id: int, user_id: int, tariff: 
         payload=payload,
         provider_token=provider_token,
         currency="RUB",
-        prices=[LabeledPrice(label=label, amount=amount)],
-        recurring=True,
-        max_tip_amount=0
+        prices=[LabeledPrice(label=label, amount=amount)]
     )
     
     logger.info(f"Invoice отправлен для user_id={user_id}, payload={payload}, tariff={tariff}")
@@ -407,7 +405,7 @@ async def subscribe_callback_handler(callback_query: CallbackQuery, bot: Bot, st
         
         logger.info(f"Попытка отправить invoice пользователю {user_id}. Режим: {'TEST' if TELEGRAM_PAYMENTS_TEST else 'LIVE'}, provider_token (первые 15 символов): {provider_token[:15] if provider_token else 'None'}..., длина токена: {len(provider_token) if provider_token else 0}")
         
-        # Отправляем invoice с автопродлением
+        # Отправляем invoice
         await bot.send_invoice(
             chat_id=callback_query.message.chat.id,
             title="Premium «Духовник» на 30 дней",
@@ -415,9 +413,7 @@ async def subscribe_callback_handler(callback_query: CallbackQuery, bot: Bot, st
             payload=payload,
             provider_token=provider_token,
             currency="RUB",
-            prices=[LabeledPrice(label="Premium 30 дней", amount=39900)],  # 399 рублей = 39900 копеек
-            recurring=True,
-            max_tip_amount=0
+            prices=[LabeledPrice(label="Premium 30 дней", amount=39900)]  # 399 рублей = 39900 копеек
         )
         
         logger.info(f"Invoice отправлен для user_id={user_id}, payload={payload}")
