@@ -16,11 +16,24 @@ TRIAL_DURATION_DAYS = 3
 async def is_trial_active(user_id: int) -> bool:
     """
     Проверяет активность пробного периода пользователя.
+    Обрабатывает как datetime, так и строковый формат (ISO) trial_start_date.
     """
     user_data = get_user(user_id)
     trial_start = user_data.get('trial_start_date')
     if trial_start:
-        return datetime.now() < (trial_start + timedelta(days=TRIAL_DURATION_DAYS))
+        # Обрабатываем случай, когда trial_start_date хранится как строка
+        if isinstance(trial_start, str):
+            try:
+                trial_start = datetime.fromisoformat(trial_start)
+            except (ValueError, TypeError):
+                logging.warning(f"Не удалось распарсить trial_start_date для user_id={user_id}: {trial_start}")
+                return False
+        
+        # Проверяем, что trial_start является datetime объектом
+        if isinstance(trial_start, datetime):
+            trial_end_date = trial_start + timedelta(days=TRIAL_DURATION_DAYS)
+            return datetime.now() < trial_end_date
+    
     return False
 
 async def activate_trial(user_id: int) -> bool:
