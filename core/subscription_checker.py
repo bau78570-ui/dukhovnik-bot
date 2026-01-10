@@ -138,6 +138,10 @@ async def is_subscription_active(user_id: int) -> bool:
                 user_data['status'] = 'expired'
                 logging.info(f"Пробный период истёк для user_id {user_id}, статус установлен на 'expired'")
                 return False
+            else:
+                # Пробный период еще активен
+                logging.info(f"Пробный период активен для user_id {user_id}")
+                return True
     
     # Если нет ни платной подписки, ни активного пробного периода
     return False
