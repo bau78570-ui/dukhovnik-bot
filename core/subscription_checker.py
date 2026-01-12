@@ -201,17 +201,27 @@ class AccessCheckerMiddleware(BaseMiddleware):
         else:
             print("INFO: Subscription is not active. Proceeding to check for trial activation.")
         
-        # Шаг 4: Автоматическая активация пробного периода для новых пользователей
+        # Шаг 4: Проверка пробного периода - НЕ активируем автоматически
+        # Пробный период должен активироваться только через кнопку в /start или явный вызов activate_trial()
         user_data = get_user(user_id)
         trial_start = user_data.get('trial_start_date')
         
         if trial_start is None:
-            # Пробный период еще не был активирован - активируем его автоматически
-            print("INFO: Trial period has never been activated. Activating trial automatically...")
-            await activate_trial(user_id)
-            print(f"RESULT: Trial period activated automatically. Access GRANTED for {TRIAL_DURATION_DAYS} days.")
+            # Пробный период еще не был активирован - отказываем в доступе
+            # Пользователь должен активировать пробный период через /start
+            print("INFO: Trial period has never been activated. Access DENIED.")
+            print("RESULT: User must activate trial via /start button or subscribe.")
             print("--- Access Check Finished ---\n")
-            return await handler(event, data)
+            no_access_text = (
+                "✨ <b>Эта функция — часть Premium-доступа.</b>\n\n"
+                "Для начала работы активируйте бесплатный пробный период на 3 дня через команду /start "
+                "или оформите Premium-подписку: /subscribe"
+            )
+            if isinstance(event, Message):
+                await event.answer(no_access_text, parse_mode='HTML')
+            elif isinstance(event, CallbackQuery):
+                await event.message.answer(no_access_text, parse_mode='HTML')
+            return
         else:
             # Пробный период был активирован ранее, но истек - устанавливаем статус 'expired'
             if user_data.get('status') == 'free':
@@ -222,8 +232,7 @@ class AccessCheckerMiddleware(BaseMiddleware):
             print("--- Access Check Finished ---\n")
             no_access_text = (
                 "✨ <b>Эта функция — часть Premium-доступа.</b>\n\n"
-                "Она открывает безграничное общение с AI-Собеседником и доступ к эксклюзивным материалам для вашего духовного роста.\n\n"
-                "Позвольте себе этот дар! Нажмите /subscribe, чтобы присоединиться."
+                "Ваш пробный период истек. Для продолжения использования Premium-функций оформите подписку: /subscribe"
             )
             if isinstance(event, Message):
                 await event.answer(no_access_text, parse_mode='HTML')
