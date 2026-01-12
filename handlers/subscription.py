@@ -6,7 +6,7 @@ from aiogram.filters import Command
 from aiogram.types import Message, PreCheckoutQuery, LabeledPrice, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from dotenv import load_dotenv
-from core.user_database import user_db, get_user
+from core.user_database import user_db, get_user, save_user_db
 from core.subscription_checker import activate_premium_subscription, activate_trial
 
 load_dotenv()
@@ -561,6 +561,7 @@ async def successful_payment_handler(message: Message, bot: Bot):
                 'payload': payload
             }
             user_data['payments'].append(payment_record)
+            save_user_db()  # Сохраняем изменения
             
             logger.info(f"Premium подписка успешно активирована для user_id={user_id} на {days} дней. Платеж сохранен в историю.")
             
@@ -632,6 +633,7 @@ async def recurring_payment_handler(message: Message, bot: Bot):
                 'payload': recurring_payment.invoice_payload
             }
             user_data['payments'].append(payment_record)
+            save_user_db()  # Сохраняем изменения
             
             logger.info(f"Автопродление успешно выполнено для user_id={user_id}. Подписка продлена на {days} дней.")
             
@@ -679,6 +681,7 @@ async def cancel_subscription_handler(message: Message):
         
         # Меняем статус на 'canceled'
         user_data['status'] = 'canceled'
+        save_user_db()  # Сохраняем изменения
         
         logger.info(f"Подписка отменена для user_id={user_id}. Предыдущий статус: {current_status}")
         

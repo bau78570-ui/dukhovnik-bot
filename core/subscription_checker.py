@@ -5,7 +5,7 @@ from typing import Callable, Dict, Any, Awaitable
 from aiogram import BaseMiddleware
 from aiogram.types import Message, CallbackQuery
 from datetime import datetime, timedelta
-from core.user_database import user_db, get_user # Импортируем user_db и get_user
+from core.user_database import user_db, get_user, save_user_db # Импортируем user_db, get_user и save_user_db
 
 load_dotenv()
 
@@ -52,12 +52,14 @@ async def activate_trial(user_id: int) -> bool:
             # Пробный период истек - убеждаемся, что статус установлен правильно
             if user_data.get('status') == 'free':
                 user_data['status'] = 'expired'
+                save_user_db()  # Сохраняем изменения
                 logging.info(f"Пробный период истек для user_id={user_id}, статус установлен на 'expired'")
         return is_active
     
     # Пробный период еще не был активирован - активируем его
     user_data['trial_start_date'] = datetime.now()
     user_data['status'] = 'free'
+    save_user_db()  # Сохраняем изменения
     logging.info(f"Пробный период активирован для user_id={user_id} на {TRIAL_DURATION_DAYS} дней")
     return True
 
@@ -100,6 +102,7 @@ async def activate_premium_subscription(user_id: int, duration_days: int = 30) -
         
         user_data['subscription_end_date'] = subscription_end_date
         user_data['status'] = 'premium'
+        save_user_db()  # Сохраняем изменения
         logging.info(f"Premium подписка успешно активирована для user_id={user_id}, срок действия до {subscription_end_date}")
         return True
         
@@ -226,6 +229,7 @@ class AccessCheckerMiddleware(BaseMiddleware):
             # Пробный период был активирован ранее, но истек - устанавливаем статус 'expired'
             if user_data.get('status') == 'free':
                 user_data['status'] = 'expired'
+                save_user_db()  # Сохраняем изменения
                 logging.info(f"Пробный период истёк для user_id {user_id}, статус установлен на 'expired'")
             
             print("RESULT: Trial period was activated previously but has expired. Access DENIED.")
