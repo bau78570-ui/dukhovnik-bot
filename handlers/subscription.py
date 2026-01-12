@@ -28,7 +28,10 @@ load_dotenv()
 # или "390540012:LIVE:85359" для продакшена
 PROVIDER_TOKEN_TEST = os.getenv("PROVIDER_TOKEN_TEST", "").strip()
 PROVIDER_TOKEN_LIVE = os.getenv("PROVIDER_TOKEN_LIVE", "").strip()
-TELEGRAM_PAYMENTS_TEST = os.getenv("TELEGRAM_PAYMENTS_TEST", "True").lower() == "true"
+
+# Обрабатываем переменную TELEGRAM_PAYMENTS_TEST с учетом разных форматов
+_telegram_payments_test_raw = os.getenv("TELEGRAM_PAYMENTS_TEST", "True").strip()
+TELEGRAM_PAYMENTS_TEST = _telegram_payments_test_raw.lower() in ("true", "1", "yes", "on")
 
 # Выбираем токен в зависимости от режима
 provider_token = PROVIDER_TOKEN_TEST if TELEGRAM_PAYMENTS_TEST else PROVIDER_TOKEN_LIVE
@@ -86,16 +89,34 @@ async def check_payment_config_handler(message: Message, bot: Bot):
         await message.answer("⏳ Проверяю конфигурацию...", parse_mode='HTML')
         logger.info(f"Предварительное сообщение отправлено для user_id={user_id}")
         
+        # Получаем сырое значение переменной окружения для диагностики
+        telegram_payments_test_raw = os.getenv("TELEGRAM_PAYMENTS_TEST", "True").strip()
+        
+        # Определяем тип токена (TEST или LIVE) по содержимому
+        token_type = "Неизвестно"
+        if provider_token:
+            if ":TEST:" in provider_token:
+                token_type = "TEST (тестовый)"
+            elif ":LIVE:" in provider_token:
+                token_type = "LIVE (продакшен)"
+            else:
+                token_type = "Неопределен"
+        
         config_info = (
             f"🔍 <b>Конфигурация платежей:</b>\n\n"
-            f"Режим: <b>{'TEST' if TELEGRAM_PAYMENTS_TEST else 'LIVE'}</b>\n"
-            f"PROVIDER_TOKEN_TEST: <b>{'установлен' if PROVIDER_TOKEN_TEST else 'НЕ установлен'}</b> "
+            f"<b>Режим работы:</b> <b>{'🧪 TEST (тестовый)' if TELEGRAM_PAYMENTS_TEST else '💰 LIVE (продакшен)'}</b>\n"
+            f"<b>TELEGRAM_PAYMENTS_TEST из .env:</b> <code>{telegram_payments_test_raw}</code>\n"
+            f"<b>Интерпретация:</b> {'True (тестовый режим)' if TELEGRAM_PAYMENTS_TEST else 'False (продакшен)'}\n\n"
+            f"<b>Токены:</b>\n"
+            f"PROVIDER_TOKEN_TEST: <b>{'✅ установлен' if PROVIDER_TOKEN_TEST else '❌ НЕ установлен'}</b> "
             f"({len(PROVIDER_TOKEN_TEST)} символов)\n"
-            f"PROVIDER_TOKEN_LIVE: <b>{'установлен' if PROVIDER_TOKEN_LIVE else 'НЕ установлен'}</b> "
-            f"({len(PROVIDER_TOKEN_LIVE)} символов)\n"
-            f"Текущий provider_token: <b>{'установлен' if provider_token else 'НЕ установлен'}</b> "
-            f"({len(provider_token) if provider_token else 0} символов)\n"
-            f"Валидность токена: <b>{'✅ Валиден' if validate_provider_token(provider_token) else '❌ Невалиден'}</b>\n\n"
+            f"PROVIDER_TOKEN_LIVE: <b>{'✅ установлен' if PROVIDER_TOKEN_LIVE else '❌ НЕ установлен'}</b> "
+            f"({len(PROVIDER_TOKEN_LIVE)} символов)\n\n"
+            f"<b>Текущий используемый токен:</b>\n"
+            f"Статус: <b>{'✅ установлен' if provider_token else '❌ НЕ установлен'}</b>\n"
+            f"Длина: {len(provider_token) if provider_token else 0} символов\n"
+            f"Тип токена: <b>{token_type}</b>\n"
+            f"Валидность: <b>{'✅ Валиден' if validate_provider_token(provider_token) else '❌ Невалиден'}</b>\n\n"
         )
         
         if provider_token:
