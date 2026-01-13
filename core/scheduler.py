@@ -352,21 +352,262 @@ async def _send_daily_word_notification(bot: Bot, notification_type: str, hour: 
 
 async def send_morning_notification(bot: Bot):
     """
-    Отправляет утреннее уведомление с гибридной логикой получения темы дня.
+    Отправляет утреннее уведомление с информацией из календаря и мотивационной молитвой.
+    Формат: "Доброе утро! Сегодня: [календарь]. Молитва на день: [молитва]."
     """
-    await _send_daily_word_notification(bot, 'morning', 8, 0)
+    logging.info("Начало отправки утренних уведомлений")
+    
+    # Получаем календарные данные
+    today = datetime.now()
+    date_str = today.strftime("%Y%m%d")
+    calendar_data = await fetch_and_cache_calendar_data(date_str) or {}
+    
+    # Формируем краткую информацию о календаре (100-150 символов)
+    calendar_parts = []
+    
+    # Праздники
+    holidays = calendar_data.get("holidays", [])
+    if holidays:
+        main_holiday = holidays[0] if holidays else None
+        if main_holiday:
+            calendar_parts.append(f"🎉 {main_holiday}")
+    
+    # Именины (первые 2-3 имени)
+    namedays = calendar_data.get("namedays", [])
+    if namedays:
+        namedays_short = ", ".join(namedays[:3])
+        if len(namedays) > 3:
+            namedays_short += "..."
+        calendar_parts.append(f"😇 {namedays_short}")
+    
+    # Пост
+    fasting = calendar_data.get("fasting", "")
+    if fasting and fasting != "Информация о посте не найдена." and fasting != "Поста нет.":
+        calendar_parts.append(f"🍽️ {fasting[:50]}")  # Обрезаем пост до 50 символов
+    
+    # Если ничего не найдено, используем тему дня из API
+    if not calendar_parts:
+        azbyka_api_key = os.getenv("AZBYKA_API_KEY")
+        ical_url = os.getenv("ICAL_URL")
+        theme = None
+        
+        if azbyka_api_key:
+            theme, _ = await get_calendar_theme_from_azbyka(azbyka_api_key)
+        if not theme and ical_url:
+            theme = await get_calendar_theme_from_ical(ical_url)
+        
+        if theme:
+            calendar_parts.append(f"📅 {theme}")
+        else:
+            calendar_parts.append("📅 Обычный день")
+    
+    calendar_text = " | ".join(calendar_parts)
+    # Ограничиваем до 150 символов
+    if len(calendar_text) > 150:
+        calendar_text = calendar_text[:147] + "..."
+    
+    # Генерируем мотивационную молитву через AI (100-150 символов)
+    prayer_prompt = (
+        "Напиши очень краткую (1 абзац, 100-150 символов) мотивационную молитву в позитивном стиле "
+        "Нормана Пила с православным контекстом. Молитва должна быть на успех, силу, благословение дня, "
+        "утвердительной и полной веры. Используй современный русский язык, без архаики."
+    )
+    
+    morning_prayer = "Господи, благослови этот день и дай мне силы для всех дел!"
+    try:
+        ai_prayer = await get_ai_response(prayer_prompt)
+        if ai_prayer:
+            # Ограничиваем молитву до 150 символов
+            morning_prayer = ai_prayer[:150].rsplit(' ', 1)[0] if len(ai_prayer) > 150 else ai_prayer
+            logging.info("Мотивационная молитва сгенерирована через AI")
+        else:
+            logging.warning("AI не сгенерировал молитву, используется запасная")
+    except Exception as e:
+        logging.error(f"Ошибка при генерации молитвы через AI: {e}")
+    
+    # Формируем финальное сообщение
+    message_text = (
+        f"🌅 <b>Доброе утро!</b>\n\n"
+        f"Сегодня: {calendar_text}\n\n"
+        f"🙏 <b>Молитва на день:</b>\n{morning_prayer}"
+    )
+    
+    # Отправляем уведомления пользователям
+    user_ids = list(user_db.keys())
+    sent_count = 0
+    for user_id in user_ids:
+        user_data = user_db[user_id]
+        status = user_data.get('status', 'free')
+        
+        if status in ['free', 'active']:
+            setting_enabled = user_data.get('notifications', {}).get('morning', False)
+            if setting_enabled:
+                try:
+                    await bot.send_message(user_id, message_text, parse_mode=ParseMode.HTML)
+                    sent_count += 1
+                    logging.info(f"Утреннее уведомление отправлено пользователю {user_id} (статус: {status})")
+                except Exception as e:
+                    logging.error(f"Ошибка при отправке утреннего уведомления пользователю {user_id}: {e}")
+    
+    logging.info(f"Утренние уведомления отправлены: {sent_count} пользователям")
 
 async def send_afternoon_notification(bot: Bot):
     """
-    Отправляет дневное уведомление с гибридной логикой получения темы дня.
+    Отправляет дневное уведомление со Словом дня и AI-размышлением (до 200 символов, с источником).
     """
-    await _send_daily_word_notification(bot, 'afternoon', 14, 0)
+    logging.info("Начало отправки дневных уведомлений")
+    
+    # Получаем тему дня (для контекста)
+    azbyka_api_key = os.getenv("AZBYKA_API_KEY")
+    ical_url = os.getenv("ICAL_URL")
+    theme = None
+    
+    if azbyka_api_key:
+        theme, _ = await get_calendar_theme_from_azbyka(azbyka_api_key)
+    if not theme and ical_url:
+        theme = await get_calendar_theme_from_ical(ical_url)
+    
+    # Выбираем случайное Слово дня
+    scripture = "Неизвестный стих"
+    source = "Неизвестный источник"
+    base_reflection = "Размышление не найдено."
+    
+    try:
+        if not daily_words:
+            logging.error("ERROR: daily_words библиотека пуста для дневной рассылки.")
+        else:
+            selected_word = random.choice(daily_words)
+            scripture = selected_word['scripture']
+            source = selected_word.get('source', 'Неизвестный источник')
+            base_reflection = selected_word.get('base_reflection', 'Размышление не найдено.')
+            logging.info(f"Выбрано Слово Дня для дневной рассылки: {scripture} ({source})")
+    except Exception as e:
+        logging.error(f"ERROR: Ошибка при выборе слова дня из daily_words для дневной рассылки: {e}")
+    
+    # Генерируем AI-размышление (до 200 символов)
+    ai_reflection = base_reflection
+    try:
+        theme_context = f" и темы дня '{theme}'" if theme else ""
+        prompt = (
+            f"На основе стиха _{scripture}_{theme_context}, "
+            "напиши очень краткое (до 200 символов) вдохновляющее размышление в позитивном стиле "
+            "(Норман Пил, православный контекст). Сделай акцент на практическом применении "
+            "этой мысли в сегодняшнем дне."
+        )
+        logging.info(f"Сформирован промт для AI в дневной рассылке: {prompt[:100]}...")
+        ai_response = await get_ai_response(prompt)
+        if ai_response:
+            # Ограничиваем до 200 символов
+            ai_reflection = ai_response[:200].rsplit(' ', 1)[0] if len(ai_response) > 200 else ai_response
+            logging.info("Получен AI-ответ для дневной рассылки.")
+        else:
+            logging.warning("WARNING: AI не сгенерировал размышление для дневной рассылки. Используем базовое.")
+    except Exception as e:
+        logging.error(f"ERROR: Ошибка при генерации AI-размышления в дневной рассылке: {e}. Используем базовое.")
+    
+    # Преобразуем markdown в HTML
+    ai_reflection_html = convert_markdown_to_html(ai_reflection)
+    
+    # Формируем сообщение
+    scripture_escaped = escape(scripture) if scripture else ""
+    caption = (
+        f"📖 <b>Слово Дня</b>\n\n"
+        f"<i>{scripture_escaped}</i>\n"
+        f"<b>Источник:</b> {source}\n\n"
+        f"{ai_reflection_html}\n\n"
+        f"#Православие #СловоДня"
+    )
+    
+    # Выбираем случайное изображение
+    daily_word_images_path = 'assets/images/daily_word/'
+    fallback_image_path = 'assets/images/logo.png'
+    image_to_send = fallback_image_path
+    try:
+        if os.path.exists(daily_word_images_path) and os.listdir(daily_word_images_path):
+            image_files = [f for f in os.listdir(daily_word_images_path) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+            if image_files:
+                random_image = random.choice(image_files)
+                image_to_send = os.path.join(daily_word_images_path, random_image)
+                logging.info(f"Выбрано изображение для дневной рассылки: {image_to_send}")
+            else:
+                logging.warning(f"WARNING: В папке {daily_word_images_path} нет подходящих изображений. Используется запасное.")
+        else:
+            logging.warning(f"WARNING: Папка {daily_word_images_path} не найдена или пуста. Используется запасное изображение.")
+    except Exception as e:
+        logging.error(f"ERROR: Ошибка при выборе изображения для дневной рассылки: {e}. Используется запасное.")
+    
+    # Отправляем уведомления
+    user_ids = list(user_db.keys())
+    sent_count = 0
+    for user_id in user_ids:
+        user_data = user_db[user_id]
+        status = user_data.get('status', 'free')
+        
+        if status in ['free', 'active']:
+            setting_enabled = user_data.get('notifications', {}).get('daily', False)
+            if setting_enabled:
+                try:
+                    photo_file = FSInputFile(image_to_send)
+                    await bot.send_photo(user_id, photo=photo_file, caption=caption, parse_mode=ParseMode.HTML)
+                    sent_count += 1
+                    logging.info(f"Дневное уведомление отправлено пользователю {user_id} (статус: {status})")
+                except Exception as e:
+                    logging.error(f"ERROR: Ошибка при отправке дневного уведомления пользователю {user_id}: {e}")
+    
+    logging.info(f"Дневные уведомления отправлены: {sent_count} пользователям")
 
 async def send_evening_notification(bot: Bot):
     """
-    Отправляет вечернее уведомление с гибридной логикой получения темы дня.
+    Отправляет вечернее уведомление с вечерней молитвой и вопросом для рефлексии.
+    Формат: "Добрый вечер! Вечерняя молитва: [молитва]. Что сегодня принесло радость?"
     """
-    await _send_daily_word_notification(bot, 'evening', 20, 0)
+    logging.info("Начало отправки вечерних уведомлений")
+    
+    # Генерируем вечернюю молитву через AI (100-150 символов)
+    evening_prayer_prompt = (
+        "Напиши очень краткую (1 абзац, 100-150 символов) вечернюю молитву в позитивном стиле "
+        "Нормана Пила с православным контекстом. Молитва должна быть спокойной, благодарственной, "
+        "на покой и рефлексию. Используй современный русский язык, без архаики. "
+        "Акцент на благодарности за день и просьбе о покое на ночь."
+    )
+    
+    evening_prayer = "Господи, благодарю Тебя за этот день. Дай мне покой и мир на ночь."
+    try:
+        ai_prayer = await get_ai_response(evening_prayer_prompt)
+        if ai_prayer:
+            # Ограничиваем молитву до 150 символов
+            evening_prayer = ai_prayer[:150].rsplit(' ', 1)[0] if len(ai_prayer) > 150 else ai_prayer
+            logging.info("Вечерняя молитва сгенерирована через AI")
+        else:
+            logging.warning("AI не сгенерировал вечернюю молитву, используется запасная")
+    except Exception as e:
+        logging.error(f"Ошибка при генерации вечерней молитвы через AI: {e}")
+    
+    # Формируем финальное сообщение
+    message_text = (
+        f"🌙 <b>Добрый вечер!</b>\n\n"
+        f"🙏 <b>Вечерняя молитва:</b>\n{evening_prayer}\n\n"
+        f"💭 <b>Что сегодня принесло радость?</b> Поделитесь в чате!"
+    )
+    
+    # Отправляем уведомления пользователям
+    user_ids = list(user_db.keys())
+    sent_count = 0
+    for user_id in user_ids:
+        user_data = user_db[user_id]
+        status = user_data.get('status', 'free')
+        
+        if status in ['free', 'active']:
+            setting_enabled = user_data.get('notifications', {}).get('evening', False)
+            if setting_enabled:
+                try:
+                    await bot.send_message(user_id, message_text, parse_mode=ParseMode.HTML)
+                    sent_count += 1
+                    logging.info(f"Вечернее уведомление отправлено пользователю {user_id} (статус: {status})")
+                except Exception as e:
+                    logging.error(f"Ошибка при отправке вечернего уведомления пользователю {user_id}: {e}")
+    
+    logging.info(f"Вечерние уведомления отправлены: {sent_count} пользователям")
 
 scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
 
