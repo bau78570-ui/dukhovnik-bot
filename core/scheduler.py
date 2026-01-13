@@ -336,11 +336,29 @@ async def send_evening_notification(bot: Bot):
     
     # Формируем финальное сообщение (экранируем пользовательские данные)
     evening_prayer_escaped = escape(evening_prayer) if evening_prayer else ""
-    message_text = (
+    caption = (
         f"🌙 <b>Добрый вечер!</b>\n\n"
         f"🙏 <b>Вечерняя молитва:</b>\n{evening_prayer_escaped}\n\n"
         f"💭 <b>Что сегодня принесло радость?</b> Поделитесь в чате!"
     )
+    
+    # Выбираем случайное изображение (используем те же изображения, что и для дневного уведомления)
+    daily_word_images_path = 'assets/images/daily_word/'
+    fallback_image_path = 'assets/images/logo.png'
+    image_to_send = fallback_image_path
+    try:
+        if os.path.exists(daily_word_images_path) and os.listdir(daily_word_images_path):
+            image_files = [f for f in os.listdir(daily_word_images_path) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+            if image_files:
+                random_image = random.choice(image_files)
+                image_to_send = os.path.join(daily_word_images_path, random_image)
+                logging.info(f"Выбрано изображение для вечерней рассылки: {image_to_send}")
+            else:
+                logging.warning(f"WARNING: В папке {daily_word_images_path} нет подходящих изображений. Используется запасное.")
+        else:
+            logging.warning(f"WARNING: Папка {daily_word_images_path} не найдена или пуста. Используется запасное изображение.")
+    except Exception as e:
+        logging.error(f"ERROR: Ошибка при выборе изображения для вечерней рассылки: {e}. Используется запасное.")
     
     # Отправляем уведомления пользователям
     user_ids = list(user_db.keys())
@@ -353,7 +371,8 @@ async def send_evening_notification(bot: Bot):
             setting_enabled = user_data.get('notifications', {}).get('evening', False)
             if setting_enabled:
                 try:
-                    await bot.send_message(user_id, message_text, parse_mode=ParseMode.HTML)
+                    photo_file = FSInputFile(image_to_send)
+                    await bot.send_photo(user_id, photo=photo_file, caption=caption, parse_mode=ParseMode.HTML)
                     sent_count += 1
                     logging.info(f"Вечернее уведомление отправлено пользователю {user_id} (статус: {status})")
                 except Exception as e:

@@ -172,16 +172,17 @@ async def molitva_handler(message: Message, bot: Bot, state: FSMContext):
     if sent_message:
         await state.update_data(last_bot_message_id=sent_message.message_id)
 
-@router.message(Command("daily_word"))
-async def daily_word_handler(message: Message, bot: Bot, state: FSMContext):
-    """
-    Обработчик для команды /daily_word.
-    Заглушка для Слова Дня.
-    """
-    await send_and_delete_previous(
-        bot=bot,
-        chat_id=message.chat.id,
-        state=state,
-        text="Готовлю Слово Дня...",
-        show_typing=False
-    )
+# Скрыто - Слово дня доступно только через уведомления
+# @router.message(Command("daily_word"))
+# async def daily_word_handler(message: Message, bot: Bot, state: FSMContext):
+#     """
+#     Обработчик для команды /daily_word.
+#     Заглушка для Слова Дня.
+#     """
+#     await send_and_delete_previous(
+#         bot=bot,
+#         chat_id=message.chat.id,
+#         state=state,
+#         text="Готовлю Слово Дня...",
+#         show_typing=False
+#     )
