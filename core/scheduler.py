@@ -173,11 +173,13 @@ async def send_morning_notification(bot: Bot):
     except Exception as e:
         logging.error(f"Ошибка при генерации молитвы через AI: {e}")
     
-    # Формируем финальное сообщение
+    # Формируем финальное сообщение (экранируем пользовательские данные)
+    calendar_text_escaped = escape(calendar_text) if calendar_text else ""
+    morning_prayer_escaped = escape(morning_prayer) if morning_prayer else ""
     message_text = (
         f"🌅 <b>Доброе утро!</b>\n\n"
-        f"Сегодня: {calendar_text}\n\n"
-        f"🙏 <b>Молитва на день:</b>\n{morning_prayer}"
+        f"Сегодня: {calendar_text_escaped}\n\n"
+        f"🙏 <b>Молитва на день:</b>\n{morning_prayer_escaped}"
     )
     
     # Отправляем уведомления пользователям
@@ -256,12 +258,13 @@ async def send_afternoon_notification(bot: Bot):
     # Преобразуем markdown в HTML
     ai_reflection_html = convert_markdown_to_html(ai_reflection)
     
-    # Формируем сообщение
+    # Формируем сообщение (экранируем все пользовательские данные)
     scripture_escaped = escape(scripture) if scripture else ""
+    source_escaped = escape(source) if source else ""
     caption = (
         f"📖 <b>Слово Дня</b>\n\n"
         f"<i>{scripture_escaped}</i>\n"
-        f"<b>Источник:</b> {source}\n\n"
+        f"<b>Источник:</b> {source_escaped}\n\n"
         f"{ai_reflection_html}\n\n"
         f"#Православие #СловоДня"
     )
@@ -331,10 +334,11 @@ async def send_evening_notification(bot: Bot):
     except Exception as e:
         logging.error(f"Ошибка при генерации вечерней молитвы через AI: {e}")
     
-    # Формируем финальное сообщение
+    # Формируем финальное сообщение (экранируем пользовательские данные)
+    evening_prayer_escaped = escape(evening_prayer) if evening_prayer else ""
     message_text = (
         f"🌙 <b>Добрый вечер!</b>\n\n"
-        f"🙏 <b>Вечерняя молитва:</b>\n{evening_prayer}\n\n"
+        f"🙏 <b>Вечерняя молитва:</b>\n{evening_prayer_escaped}\n\n"
         f"💭 <b>Что сегодня принесло радость?</b> Поделитесь в чате!"
     )
     
