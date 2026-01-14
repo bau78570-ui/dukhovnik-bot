@@ -68,6 +68,7 @@ async def get_daily_word_callback_handler(callback: CallbackQuery, bot: Bot, sta
     """
     Обрабатывает нажатие на кнопку "Получить Слово Дня" и генерирует размышление.
     """
+    # Отвечаем на callback только один раз в начале функции
     await callback.answer("Генерирую Слово Дня...", show_alert=False)
     chat_id = callback.message.chat.id
     
@@ -76,7 +77,6 @@ async def get_daily_word_callback_handler(callback: CallbackQuery, bot: Bot, sta
         if not daily_words:
             logging.error("ERROR: daily_words библиотека пуста в get_daily_word_callback_handler.")
             await callback.message.answer("Простите, библиотека 'Слово Дня' пуста. Пожалуйста, попробуйте позже.")
-            await callback.answer()
             return
 
         # Выбираем случайный элемент из daily_words
@@ -99,7 +99,6 @@ async def get_daily_word_callback_handler(callback: CallbackQuery, bot: Bot, sta
         if not ai_reflection:
             logging.error("ERROR: AI-ответ для Слова Дня пуст.")
             await callback.message.answer("Простите, не удалось получить размышление от AI. Пожалуйста, попробуйте позже.")
-            await callback.answer()
             return
         logging.info("Получен AI-ответ для Слова Дня.")
 
@@ -191,7 +190,6 @@ async def get_daily_word_callback_handler(callback: CallbackQuery, bot: Bot, sta
                 text="Простите, произошла ошибка при отправке Слова Дня. Пожалуйста, попробуйте позже.",
                 parse_mode='HTML'
             )
-            await callback.answer()
             return
         
     except Exception as e:
@@ -200,7 +198,6 @@ async def get_daily_word_callback_handler(callback: CallbackQuery, bot: Bot, sta
             text="Простите, произошла ошибка при получении Слова Дня. Пожалуйста, попробуйте позже.",
             parse_mode='HTML'
         )
-        await callback.answer()
 
 
 # @router.message(Command("fasting_info"))
