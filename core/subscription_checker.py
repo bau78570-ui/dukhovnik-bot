@@ -161,8 +161,38 @@ class AccessCheckerMiddleware(BaseMiddleware):
         print("\n--- Access Check Started ---")
         print(f"User ID: {user_id}, Admin ID from .env: {ADMIN_ID}")
 
-        # Команды, которые должны работать без проверки доступа
-        allowed_commands = ['/start', '/subscribe', '/support', '/documents', '/admin', '/check_payment', '/check_payment_config']
+        # Команды, которые должны работать без проверки доступа (всегда доступны)
+        allowed_commands = ['/start', '/subscribe', '/support', '/documents', '/favorites', '/settings', '/admin', '/check_payment', '/check_payment_config']
+        
+        # Callback-запросы, которые должны работать без проверки доступа (всегда доступны)
+        allowed_callbacks = [
+            'start_trial',  # Активация пробного периода
+            'subscribe_premium',  # Кнопка оформления подписки
+            'subscribe_1month', 'subscribe_3month', 'subscribe_12month',  # Выбор тарифа
+            'open_docs',  # Открытие документов
+        ]
+        # Callback-запросы, которые начинаются с этих префиксов (всегда доступны)
+        allowed_callback_prefixes = [
+            'toggle_',  # Настройки уведомлений
+            'fav_',  # Избранное (fav_page_, fav_delete_)
+        ]
+        
+        # Проверяем callback-запросы для разрешенных действий
+        if isinstance(event, CallbackQuery) and event.data:
+            callback_data = event.data
+            # Проверяем точное совпадение
+            if callback_data in allowed_callbacks:
+                print(f"INFO: Callback '{callback_data}' is allowed without access check. Access GRANTED.")
+                logging.info(f"INFO: Callback '{callback_data}' is allowed without access check. Access GRANTED.")
+                print("--- Access Check Finished ---\n")
+                return await handler(event, data)
+            # Проверяем префиксы
+            for prefix in allowed_callback_prefixes:
+                if callback_data.startswith(prefix):
+                    print(f"INFO: Callback '{callback_data}' matches allowed prefix '{prefix}'. Access GRANTED.")
+                    logging.info(f"INFO: Callback '{callback_data}' matches allowed prefix '{prefix}'. Access GRANTED.")
+                    print("--- Access Check Finished ---\n")
+                    return await handler(event, data)
         
         # Проверяем, является ли это командой, которую нужно пропустить
         if isinstance(event, Message) and event.text:
