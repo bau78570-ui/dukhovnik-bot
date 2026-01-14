@@ -63,138 +63,144 @@ router.callback_query.middleware(check_access)
 #         await state.update_data(last_bot_message_id=sent_message.message_id)
 
 
-# Скрыто - Слово дня доступно только через уведомления
-# @router.callback_query(F.data == "get_daily_word")
-# async def get_daily_word_callback_handler(callback: CallbackQuery, bot: Bot, state: FSMContext):
-#     """
-#     Обрабатывает нажатие на кнопку "Получить Слово Дня" и генерирует размышление.
-#     """
-#     await callback.answer("Генерирую Слово Дня...", show_alert=False)
-#     chat_id = callback.message.chat.id
-#     
-#     # Удаляем предыдущее сообщение с кнопкой "Получить Слово Дня" (закомментировано, так как теперь мы редактируем)
-#     # try:
-#     #     await bot.delete_message(chat_id=chat_id, message_id=callback.message.message_id)
-#     # except Exception as e:
-#     #     logging.warning(f"Не удалось удалить сообщение с кнопкой 'Получить Слово Дня': {e}")
-# 
-#     try:
-#         # Проверка на наличие daily_words
-#         if not daily_words:
-#             logging.error("ERROR: daily_words библиотека пуста в get_daily_word_callback_handler.")
-#             await callback.message.answer("Простите, библиотека 'Слово Дня' пуста. Пожалуйста, попробуйте позже.")
-#             await callback.answer()
-#             return
-# 
-#         # Выбираем случайный элемент из daily_words
-#         selected_word = random.choice(daily_words)
-#         scripture = selected_word['scripture']
-#         source = selected_word['source']
-#         logging.info(f"Слово Дня: {scripture} — {source}")
-# 
-#         # Формируем промт для AI
-#         prompt = (
-#             f"На основе стиха _{scripture}_, "
-#             "напиши очень краткое (1 абзац, до 150 символов) вдохновляющее размышление в позитивном стиле "
-#             "(Норман Пил, православный контекст). Сделай акцент на практическом применении "
-#             "этой мысли в сегодняшнем дне."
-#         )
-#         logging.info(f"Сформирован промт для AI: {prompt[:100]}...") # Логируем часть промта
-#         
-#         # Получаем AI-ответ
-#         ai_reflection = await get_ai_response(prompt)
-#         if not ai_reflection:
-#             logging.error("ERROR: AI-ответ для Слова Дня пуст.")
-#             await callback.message.answer("Простите, не удалось получить размышление от AI. Пожалуйста, попробуйте позже.")
-#             await callback.answer()
-#             return
-#         logging.info("Получен AI-ответ для Слова Дня.")
-# 
-#         # Преобразуем markdown в HTML для ai_reflection
-#         ai_reflection_html = convert_markdown_to_html(ai_reflection)
-# 
-#         # Обрезаем scripture, если он слишком длинный
-#         max_scripture_len = 200
-#         display_scripture = scripture
-#         if len(scripture) > max_scripture_len:
-#             display_scripture = scripture[:max_scripture_len].rsplit(' ', 1)[0] + "..." # Обрезаем по слову
-# 
-#         # Подготавливаем финальный текст с источником
-#         source_text = f"\n\nИсточник: {source}"
-#         final_text_without_ai = (
-#             f"📖 <b>Слово Дня</b>\n\n"
-#             f"<b>{display_scripture}</b>\n\n"
-#         )
-#         
-#         # Проверяем общую длину текста (без HTML-тегов) и обрезаем ai_reflection при необходимости
-#         max_total_length = 350
-#         # Оцениваем длину текста без HTML-тегов для проверки ограничения
-#         text_without_html_length = len(re.sub(r'<[^>]+>', '', final_text_without_ai + source_text))
-#         available_length = max_total_length - text_without_html_length
-#         
-#         # Обрезаем ai_reflection, если нужно (оставляем запас, так как HTML может добавить длину)
-#         if len(ai_reflection) > available_length - 50:
-#             # Учитываем длину суффикса "..." (3 символа) при обрезке
-#             max_reflection_length = available_length - 50 - 3
-#             truncated = ai_reflection[:max_reflection_length]
-#             # Пытаемся обрезать по последнему пробелу, если он есть
-#             if ' ' in truncated:
-#                 ai_reflection = truncated.rsplit(' ', 1)[0] + "..."
-#             else:
-#                 # Если пробелов нет, обрезаем напрямую и добавляем "..."
-#                 ai_reflection = truncated + "..."
-#             ai_reflection_html = convert_markdown_to_html(ai_reflection)
-#         
-#         # Формируем финальный текст
-#         final_text = final_text_without_ai + ai_reflection_html + source_text
-# 
-#         # Выбираем случайное изображение из assets/images/daily_word/
-#         image_dir = 'daily_word' # Относительный путь внутри assets/images/
-#         fallback_image_name = 'logo.png' # Запасное изображение, которое точно существует
-#         
-#         final_image_name = fallback_image_name # Инициализируем запасным
-# 
-#         full_image_dir_path = os.path.join('assets', 'images', image_dir)
-#         if os.path.exists(full_image_dir_path):
-#             image_files = [f for f in os.listdir(full_image_dir_path) if f.endswith(('.png', '.jpg', '.jpeg'))]
-#             if image_files:
-#                 selected_image_file = random.choice(image_files)
-#                 final_image_name = os.path.join(image_dir, selected_image_file) # Путь относительно assets/images/
-#                 logging.info(f"Выбрано изображение: {final_image_name}")
-#             else:
-#                 logging.warning(f"WARNING: В папке {full_image_dir_path} нет подходящих изображений. Используется запасное: {fallback_image_name}.")
-#         else:
-#             logging.warning(f"WARNING: Папка {full_image_dir_path} не существует. Используется запасное изображение: {fallback_image_name}.")
-# 
-#         # Создаем инлайн-кнопку "Помолиться об этом"
-#         builder = InlineKeyboardBuilder()
-#         # Изменяем callback_data, чтобы он соответствовал формату prayer_topic:
-#         builder.row(InlineKeyboardButton(text="🙏 Помолиться об этом", callback_data=f"prayer_topic:daily_word_reflection"))
-#         
-#         # Отправляем сообщение
-#         try:
-#             # Редактируем существующее сообщение
-#             await callback.message.edit_media(
-#                 media=InputMediaPhoto(media=FSInputFile(os.path.join('assets', 'images', final_image_name)), caption=final_text, parse_mode='HTML'),
-#                 reply_markup=builder.as_markup()
-#             )
-#             logging.info("Слово Дня успешно отредактировано пользователю.")
-#         except Exception as send_e:
-#             logging.error(f"ERROR: Ошибка при редактировании Слова Дня пользователю: {send_e}")
-#             await callback.message.answer(
-#                 text="Простите, произошла ошибка при отправке Слова Дня. Пожалуйста, попробуйте позже.",
-#                 parse_mode='HTML'
-#             )
-#             await callback.answer()
-#             return
-#         
-#     except Exception as e:
-#         logging.error(f"ERROR: Непредвиденная ошибка в get_daily_word_callback_handler: {e}")
-#         await callback.message.answer(
-#             text="Простите, произошла ошибка при получении Слова Дня. Пожалуйста, попробуйте позже.",
-#             parse_mode='HTML'
-#         )
-#         await callback.answer()
+@router.callback_query(F.data == "get_daily_word")
+async def get_daily_word_callback_handler(callback: CallbackQuery, bot: Bot, state: FSMContext):
+    """
+    Обрабатывает нажатие на кнопку "Получить Слово Дня" и генерирует размышление.
+    """
+    await callback.answer("Генерирую Слово Дня...", show_alert=False)
+    chat_id = callback.message.chat.id
+    
+    try:
+        # Проверка на наличие daily_words
+        if not daily_words:
+            logging.error("ERROR: daily_words библиотека пуста в get_daily_word_callback_handler.")
+            await callback.message.answer("Простите, библиотека 'Слово Дня' пуста. Пожалуйста, попробуйте позже.")
+            await callback.answer()
+            return
+
+        # Выбираем случайный элемент из daily_words
+        selected_word = random.choice(daily_words)
+        scripture = selected_word['scripture']
+        source = selected_word['source']
+        logging.info(f"Слово Дня: {scripture} — {source}")
+
+        # Формируем улучшенный промпт для AI
+        prompt = (
+            f"На основе стиха {scripture}, напиши вдохновляющее и духовно глубокое размышление в православном стиле "
+            "(3-4 абзаца, до 300 символов). Добавь исторический контекст, а также практическое применение в современной жизни "
+            "и связь с Евангелием. Стиль изложения - православный священник. Держи позитивный тон Нормана Пила. "
+            "Заверши вопросом для рефлексии, начиная его с эмодзи ❓."
+        )
+        logging.info(f"Сформирован промпт для AI: {prompt[:150]}...")
+        
+        # Получаем AI-ответ
+        ai_reflection = await get_ai_response(prompt)
+        if not ai_reflection:
+            logging.error("ERROR: AI-ответ для Слова Дня пуст.")
+            await callback.message.answer("Простите, не удалось получить размышление от AI. Пожалуйста, попробуйте позже.")
+            await callback.answer()
+            return
+        logging.info("Получен AI-ответ для Слова Дня.")
+
+        # Преобразуем markdown в HTML для ai_reflection
+        ai_reflection_html = convert_markdown_to_html(ai_reflection)
+
+        # Обрезаем scripture, если он слишком длинный
+        max_scripture_len = 200
+        display_scripture = scripture
+        if len(scripture) > max_scripture_len:
+            display_scripture = scripture[:max_scripture_len].rsplit(' ', 1)[0] + "..." # Обрезаем по слову
+
+        # Подготавливаем базовые части текста
+        source_text = f"\n\n<b>Источник:</b> {source}"
+        call_to_action = "\n\n💬 Примените это сегодня! Поделитесь мыслями в /dukhovnik."
+        
+        # Формируем заголовок и стих с эмодзи
+        header_text = f"📖 <b>Слово Дня</b>\n\n<i>{display_scripture}</i>\n\n"
+        
+        # Формируем размышление с эмодзи
+        reflection_text = f"✨ {ai_reflection_html}"
+        
+        # Собираем промежуточный текст для расчета длины
+        intermediate_text = header_text + reflection_text + source_text + call_to_action
+        
+        # Проверяем общую длину текста (без HTML-тегов) и обрезаем ai_reflection при необходимости
+        max_total_length = 350
+        text_without_html = re.sub(r'<[^>]+>', '', intermediate_text)
+        text_length = len(text_without_html)
+        
+        # Если текст превышает лимит, обрезаем ai_reflection
+        if text_length > max_total_length:
+            # Вычисляем доступную длину для размышления
+            header_length = len(re.sub(r'<[^>]+>', '', header_text))
+            source_length = len(re.sub(r'<[^>]+>', '', source_text))
+            call_to_action_length = len(call_to_action)
+            emoji_length = 2  # "✨ " в начале размышления
+            
+            available_length = max_total_length - header_length - source_length - call_to_action_length - emoji_length - 10  # запас 10 символов
+            
+            if available_length > 0:
+                # Обрезаем ai_reflection
+                if len(ai_reflection) > available_length:
+                    truncated = ai_reflection[:available_length - 3]  # оставляем место для "..."
+                    # Пытаемся обрезать по последнему пробелу
+                    if ' ' in truncated:
+                        ai_reflection = truncated.rsplit(' ', 1)[0] + "..."
+                    else:
+                        ai_reflection = truncated + "..."
+                    ai_reflection_html = convert_markdown_to_html(ai_reflection)
+                    reflection_text = f"✨ {ai_reflection_html}"
+        
+        # Формируем финальный текст с эмодзи
+        final_text = header_text + reflection_text + source_text + call_to_action
+
+        # Выбираем случайное изображение из assets/images/daily_word/
+        image_dir = 'daily_word' # Относительный путь внутри assets/images/
+        fallback_image_name = 'logo.png' # Запасное изображение, которое точно существует
+        
+        final_image_name = fallback_image_name # Инициализируем запасным
+
+        full_image_dir_path = os.path.join('assets', 'images', image_dir)
+        if os.path.exists(full_image_dir_path):
+            image_files = [f for f in os.listdir(full_image_dir_path) if f.endswith(('.png', '.jpg', '.jpeg'))]
+            if image_files:
+                selected_image_file = random.choice(image_files)
+                final_image_name = os.path.join(image_dir, selected_image_file) # Путь относительно assets/images/
+                logging.info(f"Выбрано изображение: {final_image_name}")
+            else:
+                logging.warning(f"WARNING: В папке {full_image_dir_path} нет подходящих изображений. Используется запасное: {fallback_image_name}.")
+        else:
+            logging.warning(f"WARNING: Папка {full_image_dir_path} не существует. Используется запасное изображение: {fallback_image_name}.")
+
+        # Создаем инлайн-кнопку "Помолиться об этом"
+        builder = InlineKeyboardBuilder()
+        builder.row(InlineKeyboardButton(text="🙏 Помолиться об этом", callback_data=f"prayer_topic:daily_word_reflection"))
+        
+        # Отправляем сообщение с изображением
+        try:
+            # Редактируем существующее сообщение
+            await callback.message.edit_media(
+                media=InputMediaPhoto(media=FSInputFile(os.path.join('assets', 'images', final_image_name)), caption=final_text, parse_mode='HTML'),
+                reply_markup=builder.as_markup()
+            )
+            logging.info("Слово Дня успешно отредактировано пользователю.")
+        except Exception as send_e:
+            logging.error(f"ERROR: Ошибка при редактировании Слова Дня пользователю: {send_e}")
+            await callback.message.answer(
+                text="Простите, произошла ошибка при отправке Слова Дня. Пожалуйста, попробуйте позже.",
+                parse_mode='HTML'
+            )
+            await callback.answer()
+            return
+        
+    except Exception as e:
+        logging.error(f"ERROR: Непредвиденная ошибка в get_daily_word_callback_handler: {e}", exc_info=True)
+        await callback.message.answer(
+            text="Простите, произошла ошибка при получении Слова Дня. Пожалуйста, попробуйте позже.",
+            parse_mode='HTML'
+        )
+        await callback.answer()
 
 
 # @router.message(Command("fasting_info"))
