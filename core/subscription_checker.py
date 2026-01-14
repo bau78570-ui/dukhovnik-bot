@@ -6,6 +6,7 @@ from aiogram import BaseMiddleware
 from aiogram.types import Message, CallbackQuery
 from datetime import datetime, timedelta
 from core.user_database import user_db, get_user, save_user_db # Импортируем user_db, get_user и save_user_db
+from handlers.support_handler import SupportState # Импортируем состояние поддержки
 
 load_dotenv()
 
@@ -162,7 +163,7 @@ class AccessCheckerMiddleware(BaseMiddleware):
         print(f"User ID: {user_id}, Admin ID from .env: {ADMIN_ID}")
 
         # Команды, которые должны работать без проверки доступа (всегда доступны)
-        allowed_commands = ['/start', '/subscribe', '/support', '/documents', '/settings', '/admin', '/check_payment', '/check_payment_config']
+        allowed_commands = ['/start', '/subscribe', '/support', '/documents', '/favorites', '/settings', '/admin', '/check_payment', '/check_payment_config']
         
         # Callback-запросы, которые должны работать без проверки доступа (всегда доступны)
         allowed_callbacks = [
@@ -174,6 +175,9 @@ class AccessCheckerMiddleware(BaseMiddleware):
         # Callback-запросы, которые начинаются с этих префиксов (всегда доступны)
         allowed_callback_prefixes = [
             'toggle_',  # Настройки уведомлений
+            'fav_',  # Избранное - навигация (fav_page_, fav_delete_)
+            'favorite_',  # Избранное - добавление сообщения в избранное
+            'unfavorite_',  # Избранное - удаление сообщения из избранного
         ]
         
         # Проверяем callback-запросы для разрешенных действий
@@ -192,6 +196,21 @@ class AccessCheckerMiddleware(BaseMiddleware):
                     logging.info(f"INFO: Callback '{callback_data}' matches allowed prefix '{prefix}'. Access GRANTED.")
                     print("--- Access Check Finished ---\n")
                     return await handler(event, data)
+        
+        # Проверяем состояние FSM - если пользователь в состоянии поддержки, пропускаем проверку доступа
+        if isinstance(event, Message):
+            state = data.get('state')
+            if state:
+                try:
+                    current_state = await state.get_state()
+                    # Если пользователь в состоянии поддержки, пропускаем проверку доступа
+                    if current_state == SupportState.waiting_for_message:
+                        print(f"INFO: User is in support state. Access GRANTED for support message.")
+                        logging.info(f"INFO: User is in support state. Access GRANTED for support message.")
+                        print("--- Access Check Finished ---\n")
+                        return await handler(event, data)
+                except Exception as e:
+                    logging.warning(f"WARNING: Could not get FSM state: {e}")
         
         # Проверяем, является ли это командой, которую нужно пропустить
         if isinstance(event, Message) and event.text:
