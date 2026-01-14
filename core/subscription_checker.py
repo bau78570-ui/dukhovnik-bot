@@ -162,7 +162,7 @@ class AccessCheckerMiddleware(BaseMiddleware):
         print(f"User ID: {user_id}, Admin ID from .env: {ADMIN_ID}")
 
         # Команды, которые должны работать без проверки доступа (всегда доступны)
-        allowed_commands = ['/start', '/subscribe', '/support', '/documents', '/favorites', '/settings', '/admin', '/check_payment', '/check_payment_config']
+        allowed_commands = ['/start', '/subscribe', '/support', '/documents', '/settings', '/admin', '/check_payment', '/check_payment_config']
         
         # Callback-запросы, которые должны работать без проверки доступа (всегда доступны)
         allowed_callbacks = [
@@ -174,9 +174,6 @@ class AccessCheckerMiddleware(BaseMiddleware):
         # Callback-запросы, которые начинаются с этих префиксов (всегда доступны)
         allowed_callback_prefixes = [
             'toggle_',  # Настройки уведомлений
-            'fav_',  # Избранное - навигация (fav_page_, fav_delete_)
-            'favorite_',  # Избранное - добавление сообщения в избранное
-            'unfavorite_',  # Избранное - удаление сообщения из избранного
         ]
         
         # Проверяем callback-запросы для разрешенных действий
