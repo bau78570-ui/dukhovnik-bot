@@ -126,9 +126,20 @@ async def handle_text_message(message: Message, bot: Bot, state: FSMContext):
         "церковн",  # церковный
         "свят",  # святой, святые, святки
     ]
+    normalized_text = " ".join(text.split())
+    direct_calendar_phrases = {
+        "сегодня",
+        "какой день",
+        "какой сегодня день",
+        "что за день сегодня",
+    }
     has_calendar_keyword = any(keyword in text for keyword in calendar_keywords)
-    has_today_and_calendar = "сегодня" in text and has_calendar_keyword
-    if has_calendar_keyword or has_today_and_calendar:
+    is_direct_calendar_request = (
+        normalized_text in direct_calendar_phrases
+        or normalized_text.startswith("какой день")
+        or normalized_text.startswith("какой сегодня день")
+    )
+    if has_calendar_keyword or is_direct_calendar_request:
         today = datetime.now()
         date_str = today.strftime("%Y%m%d")
         calendar_data = await get_calendar_data(date_str)
