@@ -118,7 +118,17 @@ async def handle_text_message(message: Message, bot: Bot, state: FSMContext):
 
     # Проверяем, является ли запрос пользователя запросом о православном календаре
     text = message.text.lower()
-    if any(keyword in text for keyword in ["праздник", "праздники", "пост", "посты", "именины", "сегодня", "какой день"]):
+    calendar_keywords = [
+        "календар",  # календарь, календаря
+        "праздник", "праздники",
+        "пост", "посты",
+        "именины",
+        "церковн",  # церковный
+        "свят",  # святой, святые, святки
+    ]
+    has_calendar_keyword = any(keyword in text for keyword in calendar_keywords)
+    has_today_and_calendar = "сегодня" in text and has_calendar_keyword
+    if has_calendar_keyword or has_today_and_calendar:
         today = datetime.now()
         date_str = today.strftime("%Y%m%d")
         calendar_data = await get_calendar_data(date_str)
