@@ -390,6 +390,10 @@ async def check_namedays(bot: Bot):
     
     tomorrow = datetime.now() + timedelta(days=1)
     calendar_data = await fetch_and_cache_calendar_data(tomorrow.strftime("%Y%m%d"))
+
+    if not calendar_data:
+        logging.error("ERROR: calendar_data is unavailable for nameday check.")
+        return
     
     tomorrow_date = tomorrow.strftime('%d %B')
 
