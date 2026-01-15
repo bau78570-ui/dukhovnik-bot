@@ -16,5 +16,7 @@ async def show_ai_info_handler(message: Message, bot: Bot, state: FSMContext):
         chat_id=message.chat.id,
         state=state,
         text=text,
-        show_typing=False
+        show_typing=False,
+        delete_previous=False,
+        track_last_message=False
     )

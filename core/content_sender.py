@@ -70,7 +70,8 @@ async def send_and_delete_previous(
     image_name: str = None, 
     reply_markup: InlineKeyboardMarkup = None,
     show_typing: bool = True,
-    delete_previous: bool = True
+    delete_previous: bool = True,
+    track_last_message: bool = True
 ) -> Message | None:
     """
     Отправляет сообщение, предварительно удаляя предыдущее сообщение бота,
@@ -84,6 +85,7 @@ async def send_and_delete_previous(
     :param image_name: Имя файла изображения (опционально).
     :param reply_markup: Инлайн-клавиатура (опционально).
     :param show_typing: Показывать ли статус "печатает" перед отправкой.
+    :param track_last_message: Сохранять ли message_id для последующего удаления.
     :return: Отправленное сообщение или None.
     """
     if show_typing:
@@ -108,7 +110,7 @@ async def send_and_delete_previous(
         reply_markup=reply_markup
     )
 
-    if sent_message:
+    if sent_message and track_last_message:
         await state.update_data(last_bot_message_id=sent_message.message_id)
     
     return sent_message

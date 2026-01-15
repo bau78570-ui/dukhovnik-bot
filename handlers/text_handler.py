@@ -112,7 +112,9 @@ async def handle_text_message(message: Message, bot: Bot, state: FSMContext):
             state=state,
             text=formatted_response,
             image_name=image_to_send_name,
-            reply_markup=get_favorite_keyboard(message.message_id) # Добавляем кнопку "В избранное"
+            reply_markup=get_favorite_keyboard(message.message_id), # Добавляем кнопку "В избранное"
+            delete_previous=False,
+            track_last_message=False
         )
         return # Прекращаем дальнейшую обработку этого сообщения
 
@@ -128,7 +130,9 @@ async def handle_text_message(message: Message, bot: Bot, state: FSMContext):
         chat_id=chat_id,
         state=state,
         text=formatted_response,
-        reply_markup=get_favorite_keyboard(message.message_id)
+        reply_markup=get_favorite_keyboard(message.message_id),
+        delete_previous=False,
+        track_last_message=False
     )
 
 @router.callback_query(F.data.startswith('favorite_'))

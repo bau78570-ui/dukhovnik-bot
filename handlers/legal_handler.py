@@ -43,7 +43,9 @@ async def documents_handler(message: Message, bot: Bot, state: FSMContext):
         state=state,
         text=text,
         reply_markup=markup,
-        show_typing=False
+        show_typing=False,
+        delete_previous=False,
+        track_last_message=False
     )
 
 @router.callback_query(F.data == "open_docs")
@@ -91,6 +93,8 @@ async def open_docs_callback(callback: CallbackQuery, bot: Bot, state: FSMContex
         state=state,
         text=text,
         reply_markup=builder.as_markup(),
-        show_typing=False
+        show_typing=False,
+        delete_previous=False,
+        track_last_message=False
     )
 

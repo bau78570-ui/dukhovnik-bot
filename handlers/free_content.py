@@ -44,7 +44,9 @@ async def calendar_handler(message: Message, bot: Bot, state: FSMContext):
                 chat_id=chat_id,
                 state=state,
                 text="Простите, не удалось получить актуальные данные календаря.",
-                show_typing=False
+                show_typing=False,
+                delete_previous=False,
+                track_last_message=False
             )
             return
 
@@ -88,7 +90,8 @@ async def calendar_handler(message: Message, bot: Bot, state: FSMContext):
                 image_name=image_url, # Предполагаем, что image_url здесь - это относительный путь к файлу
                 reply_markup=builder.as_markup(),
                 show_typing=False,
-                delete_previous=False # Не удаляем предыдущее сообщение (команду пользователя)
+                delete_previous=False, # Не удаляем предыдущее сообщение (команду пользователя)
+                track_last_message=False
             )
         else:
             await send_and_delete_previous(
@@ -98,7 +101,8 @@ async def calendar_handler(message: Message, bot: Bot, state: FSMContext):
                 text=main_caption_text,
                 reply_markup=builder.as_markup(),
                 show_typing=False,
-                delete_previous=False # Не удаляем предыдущее сообщение (команду пользователя)
+                delete_previous=False, # Не удаляем предыдущее сообщение (команду пользователя)
+                track_last_message=False
             )
 
         # Отдельное сообщение для мыслей Феофана Затворника, если они есть
@@ -119,7 +123,8 @@ async def calendar_handler(message: Message, bot: Bot, state: FSMContext):
                 state=state,
                 text=theophan_message_text,
                 show_typing=False,
-                delete_previous=False # Не удаляем предыдущее сообщение (основной календарь)
+                delete_previous=False, # Не удаляем предыдущее сообщение (основной календарь)
+                track_last_message=False
             )
         else:
             await send_and_delete_previous(
@@ -128,7 +133,8 @@ async def calendar_handler(message: Message, bot: Bot, state: FSMContext):
                 state=state,
                 text="📖 <b>Мысли Святителя Феофана Затворника на каждый день года:</b>\nНет мыслей на этот день.",
                 show_typing=False,
-                delete_previous=False # Не удаляем предыдущее сообщение (основной календарь)
+                delete_previous=False, # Не удаляем предыдущее сообщение (основной календарь)
+                track_last_message=False
             )
 
     except Exception as e:
@@ -138,7 +144,9 @@ async def calendar_handler(message: Message, bot: Bot, state: FSMContext):
             chat_id=chat_id,
             state=state,
             text="Простите, произошла непредвиденная ошибка при загрузке календаря. Пожалуйста, попробуйте чуть позже.",
-            show_typing=False
+            show_typing=False,
+            delete_previous=False,
+            track_last_message=False
         )
 
 
