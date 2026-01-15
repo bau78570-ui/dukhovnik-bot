@@ -398,8 +398,8 @@ async def check_namedays(bot: Bot):
     tomorrow_date = tomorrow.strftime('%d %B')
 
     saints_on_nameday = set()
-    if calendar_data.get("saints"):
-        for saint_name in calendar_data["saints"]:
+    if calendar_data.get("namedays"):
+        for saint_name in calendar_data["namedays"]:
             saints_on_nameday.add(saint_name.split(' ')[0].lower())
 
     users_with_namedays = get_all_users_with_namedays()
