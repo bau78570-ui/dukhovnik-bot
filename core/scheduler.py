@@ -108,10 +108,10 @@ async def send_morning_notification(bot: Bot):
 
     today = datetime.now()
     date_str = today.strftime("%Y%m%d")
-    calendar_data = await fetch_and_cache_calendar_data(date_str) or {}
+    calendar_data = await fetch_and_cache_calendar_data(date_str)
 
     if not calendar_data:
-        logging.error(f"ERROR: calendar_data is empty for date {date_str} in morning notification.")
+        logging.error(f"ERROR: calendar_data is unavailable for date {date_str} in morning notification.")
         return
 
     # Формируем список праздников

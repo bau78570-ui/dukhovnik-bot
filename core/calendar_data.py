@@ -54,10 +54,6 @@ async def fetch_and_cache_calendar_data(date_str: str):
         "theophan_thoughts": []
     }
 
-    # Попытка получить данные с azbyka.ru (всегда по новому стилю)
-    azbyka_url = f"{AZBYKA_BASE_URL}{year}-{month:02d}-{day:02d}/"
-    azbyka_html_content = await fetch_html_content(azbyka_url)
-    
     if azbyka_html_content:
         azbyka_data = parse_azbyka_calendar_page(azbyka_html_content)
         if azbyka_data and (azbyka_data["holidays"] or azbyka_data["namedays"] or azbyka_data["fasting"] != "Поста нет." or azbyka_data["week_info"]):
@@ -69,6 +65,10 @@ async def fetch_and_cache_calendar_data(date_str: str):
     old_style_date_str = old_style_date_obj.strftime("%Y%m%d")
     pravoslavie_new_style_equivalent_url = f"{PRAVOSLAVIE_BASE_URL}{old_style_date_str}.html"
     pravoslavie_new_style_equivalent_html_content = await fetch_html_content(pravoslavie_new_style_equivalent_url)
+
+    if not azbyka_html_content and not pravoslavie_new_style_equivalent_html_content:
+        print(f"ERROR: Не удалось получить данные календаря для {date_str} (оба источника недоступны).")
+        return None
 
     if pravoslavie_new_style_equivalent_html_content:
         pravoslavie_data = parse_pravoslavie_calendar_page(pravoslavie_new_style_equivalent_html_content)
