@@ -116,85 +116,8 @@ async def handle_text_message(message: Message, bot: Bot, state: FSMContext):
         )
         return # Прекращаем дальнейшую обработку этого сообщения
 
-    # Проверяем, является ли запрос пользователя запросом о православном календаре
-    text = message.text.lower()
-    calendar_keywords = [
-        "календар",  # календарь, календаря
-        "праздник", "праздники",
-        "пост", "посты",
-        "именины",
-        "церковн",  # церковный
-        "свят",  # святой, святые, святки
-    ]
-    normalized_text = " ".join(text.split())
-    direct_calendar_phrases = {
-        "сегодня",
-        "какой день",
-        "какой сегодня день",
-        "что за день сегодня",
-    }
-    has_calendar_keyword = any(keyword in text for keyword in calendar_keywords)
-    is_direct_calendar_request = (
-        normalized_text in direct_calendar_phrases
-        or normalized_text.startswith("какой день")
-        or normalized_text.startswith("какой сегодня день")
-    )
-    if has_calendar_keyword or is_direct_calendar_request:
-        today = datetime.now()
-        date_str = today.strftime("%Y%m%d")
-        calendar_data = await get_calendar_data(date_str)
+    # Календарь запрашивается отдельной командой /calendar
 
-        if calendar_data:
-            response_parts = ["✨ <b>Православный календарь на сегодня</b> ✨\n"]
-            
-            # Дата
-            response_parts.append(f"🗓️ <b>Дата:</b> {today.strftime('%d.%m.%Y')}\n")
-
-            # Праздники
-            if calendar_data.get("main_holiday"):
-                response_parts.append("🎉 <b>Главный праздник:</b>")
-                response_parts.append(f"• <b>{calendar_data['main_holiday']}</b>")
-                if calendar_data.get("holidays"):
-                    response_parts.append("\n<b>Другие праздники:</b>")
-                    for holiday in calendar_data["holidays"]:
-                        response_parts.append(f"• {holiday}")
-                response_parts.append("") # Пустая строка для разделения
-            elif calendar_data.get("holidays"):
-                response_parts.append("🎉 <b>Праздники:</b>")
-                for holiday in calendar_data["holidays"]:
-                    response_parts.append(f"• {holiday}")
-                response_parts.append("") # Пустая строка для разделения
-            else:
-                response_parts.append("🎉 <b>Праздники:</b> Сегодня больших праздников не найдено.")
-                response_parts.append("")
-
-            # Пост
-            response_parts.append(f"🍽️ <b>Пост:</b> {calendar_data['fasting']}\n")
-
-            # Седмица
-            if calendar_data["week_info"]:
-                response_parts.append(f"⛪ <b>Седмица:</b> {calendar_data['week_info']}\n")
-
-            # Именины
-            if calendar_data["namedays"]:
-                response_parts.append("😇 <b>Именины:</b>")
-                for name in calendar_data["namedays"]:
-                    response_parts.append(f"• {name}")
-                response_parts.append("")
-            else:
-                response_parts.append("😇 <b>Именины:</b> Сегодня именин не найдено.")
-                response_parts.append("")
-            
-            formatted_response = "\n".join(response_parts)
-            await send_and_delete_previous(
-                bot=bot,
-                chat_id=chat_id,
-                state=state,
-                text=formatted_response,
-                reply_markup=get_favorite_keyboard(message.message_id)
-            )
-            return # Прекращаем дальнейшую обработку этого сообщения
-    
     # Если не в режиме молитвы и не запрос календаря, работаем как обычно
     ai_response = await get_ai_response(message.text)
     # Преобразуем Markdown в HTML

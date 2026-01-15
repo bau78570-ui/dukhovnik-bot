@@ -3,6 +3,7 @@ import aiohttp
 import logging
 import asyncio
 import random
+import re
 from icalendar import Calendar
 from datetime import datetime, date, timedelta
 from dotenv import load_dotenv
@@ -100,105 +101,104 @@ async def get_calendar_theme_from_azbyka(api_key: str | None) -> tuple[str | Non
 
 async def send_morning_notification(bot: Bot):
     """
-    Отправляет утреннее уведомление с информацией из календаря и мотивационной молитвой.
-    Формат: "Доброе утро! Сегодня: [календарь]. Молитва на день: [молитва]."
+    Отправляет утреннее уведомление: сначала приветствие с изображением,
+    затем православный календарь в том же формате, что и /calendar.
     """
     logging.info("Начало отправки утренних уведомлений")
-    
-    # Получаем календарные данные
+
     today = datetime.now()
     date_str = today.strftime("%Y%m%d")
     calendar_data = await fetch_and_cache_calendar_data(date_str) or {}
-    
-    # Формируем краткую информацию о календаре (100-150 символов)
-    calendar_parts = []
-    
-    # Праздники
+
+    if not calendar_data:
+        logging.error(f"ERROR: calendar_data is empty for date {date_str} in morning notification.")
+        return
+
+    # Формируем список праздников
     holidays = calendar_data.get("holidays", [])
     if holidays:
-        main_holiday = holidays[0] if holidays else None
-        if main_holiday:
-            calendar_parts.append(f"🎉 {main_holiday}")
-    
-    # Именины (первые 2-3 имени)
+        holidays_text = "✨ <b>Праздники:</b>\n" + "\n".join([f"• {h}" for h in holidays]) + "\n\n"
+    else:
+        holidays_text = "✨ <b>Сегодня больших праздников не найдено.</b>\n\n"
+
+    # Формируем список именин
     namedays = calendar_data.get("namedays", [])
     if namedays:
-        namedays_short = ", ".join(namedays[:3])
-        if len(namedays) > 3:
-            namedays_short += "..."
-        calendar_parts.append(f"😇 {namedays_short}")
-    
-    # Пост
-    fasting = calendar_data.get("fasting", "")
-    if fasting and fasting != "Информация о посте не найдена." and fasting != "Поста нет.":
-        calendar_parts.append(f"🍽️ {fasting[:50]}")  # Обрезаем пост до 50 символов
-    
-    # Если ничего не найдено, используем тему дня из API
-    if not calendar_parts:
-        azbyka_api_key = os.getenv("AZBYKA_API_KEY")
-        ical_url = os.getenv("ICAL_URL")
-        theme = None
-        
-        if azbyka_api_key:
-            theme, _ = await get_calendar_theme_from_azbyka(azbyka_api_key)
-        if not theme and ical_url:
-            theme = await get_calendar_theme_from_ical(ical_url)
-        
-        if theme:
-            calendar_parts.append(f"📅 {theme}")
-        else:
-            calendar_parts.append("📅 Обычный день")
-    
-    calendar_text = " | ".join(calendar_parts)
-    # Ограничиваем до 150 символов
-    if len(calendar_text) > 150:
-        calendar_text = calendar_text[:147] + "..."
-    
-    # Генерируем мотивационную молитву через AI (100-150 символов)
-    prayer_prompt = (
-        "Напиши очень краткую (1 абзац, 100-150 символов) мотивационную молитву в позитивном стиле "
-        "Нормана Пила с православным контекстом. Молитва должна быть на успех, силу, благословение дня, "
-        "утвердительной и полной веры. Используй современный русский язык, без архаики."
+        namedays_text = "😇 <b>Именины:</b>\n" + "\n".join([f"• {n}" for n in namedays]) + "\n\n"
+    else:
+        namedays_text = "😇 <b>Именин нет.</b>\n\n"
+
+    # Основная часть сообщения (как в /calendar)
+    main_caption_text = (
+        f"🗓️ <b>Православный календарь на сегодня</b> ✨\n\n"
+        f"🗓️ <b>Дата:</b> {today.strftime('%d.%m.%Y')}\n\n"
+        f"{holidays_text}"
+        f"ℹ️ <b>Пост:</b> {calendar_data.get('fasting', 'Информация о посте не найдена.')}\n\n"
+        f"🏛️ <b>Седмица:</b> {calendar_data.get('week_info', 'Информация о седмице не найдена.')}\n\n"
+        f"{namedays_text}"
+        f"_Данные предоставлены pravoslavie.ru и azbyka.ru_"
     )
-    
-    morning_prayer = "Господи, благослови этот день и дай мне силы для всех дел!"
-    try:
-        ai_prayer = await get_ai_response(prayer_prompt)
-        if ai_prayer:
-            # Ограничиваем молитву до 150 символов
-            morning_prayer = ai_prayer[:150].rsplit(' ', 1)[0] if len(ai_prayer) > 150 else ai_prayer
-            logging.info("Мотивационная молитва сгенерирована через AI")
-        else:
-            logging.warning("AI не сгенерировал молитву, используется запасная")
-    except Exception as e:
-        logging.error(f"Ошибка при генерации молитвы через AI: {e}")
-    
-    # Формируем финальное сообщение (экранируем пользовательские данные)
-    calendar_text_escaped = escape(calendar_text) if calendar_text else ""
-    morning_prayer_escaped = escape(morning_prayer) if morning_prayer else ""
-    message_text = (
-        f"🌅 <b>Доброе утро!</b>\n\n"
-        f"Сегодня: {calendar_text_escaped}\n\n"
-        f"🙏 <b>Молитва на день:</b>\n{morning_prayer_escaped}"
+
+    # Отдельное сообщение для мыслей Феофана Затворника
+    theophan_thoughts = calendar_data.get('theophan_thoughts', [])
+    if theophan_thoughts:
+        header = "📖 <b>Мысли Святителя Феофана Затворника на каждый день года:</b>\n\n"
+        formatted_thoughts = []
+        for thought in theophan_thoughts:
+            cleaned_thought = re.sub(r'^\s*[\(\);,.]+\s*', '', thought)
+            if cleaned_thought.strip():
+                formatted_thoughts.append(f"✨ <i>{cleaned_thought.strip()}</i>\n\n")
+        theophan_message_text = header + "".join(formatted_thoughts).strip()
+    else:
+        theophan_message_text = (
+            "📖 <b>Мысли Святителя Феофана Затворника на каждый день года:</b>\n"
+            "Нет мыслей на этот день."
+        )
+
+    # Приветствие с изображением
+    greeting_text = (
+        "🌅 <b>Доброе утро!</b>\n\n"
+        "Помолимся на день грядущий. Пусть он будет благословенным."
     )
-    
+    greeting_image = "logo.png"
+
     # Отправляем уведомления пользователям
     user_ids = list(user_db.keys())
     sent_count = 0
     for user_id in user_ids:
         user_data = user_db[user_id]
         status = user_data.get('status', 'free')
-        
+
         if status in ['free', 'active']:
             setting_enabled = user_data.get('notifications', {}).get('morning', False)
             if setting_enabled:
                 try:
-                    await bot.send_message(user_id, message_text, parse_mode=ParseMode.HTML)
+                    await send_content_message(
+                        bot=bot,
+                        chat_id=user_id,
+                        text=greeting_text,
+                        image_name=greeting_image
+                    )
+
+                    image_url = calendar_data.get("image_url")
+                    await send_content_message(
+                        bot=bot,
+                        chat_id=user_id,
+                        text=main_caption_text,
+                        image_name=image_url
+                    )
+
+                    await send_content_message(
+                        bot=bot,
+                        chat_id=user_id,
+                        text=theophan_message_text
+                    )
+
                     sent_count += 1
-                    logging.info(f"Утреннее уведомление отправлено пользователю {user_id} (статус: {status})")
+                    logging.info(f"Утренние уведомления отправлены пользователю {user_id} (статус: {status})")
                 except Exception as e:
-                    logging.error(f"Ошибка при отправке утреннего уведомления пользователю {user_id}: {e}")
-    
+                    logging.error(f"Ошибка при отправке утренних уведомлений пользователю {user_id}: {e}")
+
     logging.info(f"Утренние уведомления отправлены: {sent_count} пользователям")
 
 async def send_afternoon_notification(bot: Bot):
