@@ -23,7 +23,7 @@ def get_favorite_keyboard(message_id: int, is_favorited: bool = False) -> Inline
         [InlineKeyboardButton(text=text, callback_data=callback_data)]
     ])
 
-@router.message(F.text)
+@router.message(F.text & ~F.text.startswith('/'))
 async def handle_text_message(message: Message, bot: Bot, state: FSMContext):
     """
     Этот обработчик будет срабатывать на любое текстовое сообщение, кроме команд.
