@@ -18,7 +18,15 @@ from aiogram.enums import ParseMode
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from html import escape
 
-from core.content_library import daily_quotes, fasting_content, reading_plans, daily_words, morning_messages # Добавляем daily_words
+from core.content_library import (
+    daily_quotes,
+    fasting_content,
+    reading_plans,
+    daily_words,
+    morning_messages,
+    evening_prayer_parts,
+    evening_reflection_prompts
+)
 from core.user_database import user_db, get_all_users_with_namedays
 from core.content_sender import send_content_message
 from core.calendar_data import fetch_and_cache_calendar_data
@@ -69,6 +77,39 @@ def sanitize_plain_text(text: str) -> str:
     if not text:
         return ""
     return re.sub(r'<[^>]+>', '', text).strip()
+
+def build_evening_prayer_by_index(index: int) -> str:
+    parts = evening_prayer_parts
+    openings = parts.get("openings", [])
+    thanksgivings = parts.get("thanksgivings", [])
+    repentances = parts.get("repentances", [])
+    requests = parts.get("requests", [])
+    closings = parts.get("closings", [])
+
+    if not (openings and thanksgivings and repentances and requests and closings):
+        return (
+            "Господи, благодарю Тебя за этот день. Прости мои согрешения "
+            "и даруй мне мирный сон. Аминь."
+        )
+
+    sizes = [len(openings), len(thanksgivings), len(repentances), len(requests), len(closings)]
+    total = 1
+    for size in sizes:
+        total *= size
+    idx = index % total
+
+    def pick_from(seq, base):
+        nonlocal idx
+        choice = seq[idx % base]
+        idx //= base
+        return choice
+
+    opening = pick_from(openings, len(openings))
+    thanksgiving = pick_from(thanksgivings, len(thanksgivings))
+    repentance = pick_from(repentances, len(repentances))
+    request = pick_from(requests, len(requests))
+    closing = pick_from(closings, len(closings))
+    return " ".join([opening, thanksgiving, repentance, request, closing])
 
 async def get_calendar_theme_from_ical(ical_url: str) -> str | None:
     """
@@ -392,38 +433,44 @@ async def send_evening_notification(bot: Bot):
     """
     logging.info("Начало отправки вечерних уведомлений")
     
-    # Генерируем вечернюю молитву через AI (почти до лимита Telegram)
-    evening_prayer_prompt = (
-        "Напиши вечернюю молитву в православном стиле: глубокую, спокойную, благодарственную, "
-        "с покаянной ноткой и прошением о мире на ночь. Объем 700-900 символов. "
-        "2-3 абзаца, без списков, без эмодзи. Современный русский язык."
-    )
-    
-    evening_prayer = (
-        "Господи, благодарю Тебя за этот день и за все, что Ты послал мне. "
-        "Прости все, в чем я согрешил словом, делом и мыслью. "
-        "Даруй мне мир сердца и покой на эту ночь."
-    )
-    try:
-        ai_prayer = await get_ai_response(evening_prayer_prompt)
-        if ai_prayer and not is_ai_error(ai_prayer):
-            evening_prayer = ai_prayer
-            logging.info("Вечерняя молитва сгенерирована через AI")
-        else:
-            logging.warning("AI не сгенерировал вечернюю молитву, используется запасная")
-    except Exception as e:
-        logging.error(f"Ошибка при генерации вечерней молитвы через AI: {e}")
+    # Выбираем библейский текст
+    scripture = "Неизвестный стих"
+    source = "Неизвестный источник"
+    if daily_words:
+        selected_word = random.choice(daily_words)
+        scripture = selected_word.get("scripture", scripture)
+        source = selected_word.get("source", source)
+
+    # Составляем молитву из частей (более 100 вариантов)
+    day_index = datetime.now().timetuple().tm_yday
+    evening_prayer = build_evening_prayer_by_index(day_index)
     
     # Формируем финальное сообщение (экранируем пользовательские данные)
+    scripture_escaped = escape(scripture) if scripture else ""
+    source_escaped = escape(source) if source else ""
     evening_prayer_escaped = escape(evening_prayer) if evening_prayer else ""
-    base_caption = (
+
+    reflection_prompt = "Поделитесь в чате тем, что сегодня особенно откликнулось в сердце."
+    if evening_reflection_prompts:
+        prompt_index = day_index % len(evening_reflection_prompts)
+        reflection_prompt = evening_reflection_prompts[prompt_index]
+    reflection_prompt_escaped = escape(reflection_prompt)
+
+    base_prefix = (
         "🌙 <b>Добрый вечер!</b>\n\n"
+        "📖 <b>Слово на вечер:</b>\n"
+        f"<i>{scripture_escaped}</i>\n"
+        f"<b>Источник:</b> {source_escaped}\n\n"
         "🙏 <b>Вечерняя молитва:</b>\n"
     )
-    footer = "\n\n💭 <b>Что сегодня принесло радость?</b> Поделитесь в чате!"
-    available_len = MAX_PHOTO_CAPTION_LEN - len(base_caption) - len(footer)
-    evening_prayer_trimmed = trim_to_limit(evening_prayer_escaped, max(0, available_len))
-    caption = f"{base_caption}{evening_prayer_trimmed}{footer}"
+    reflection_header = "\n\n💬 <b>Поговорим?</b>\n"
+    remaining_len = MAX_PHOTO_CAPTION_LEN - len(base_prefix) - len(reflection_header)
+    prayer_limit = max(0, int(remaining_len * 0.65))
+    reflection_limit = max(0, remaining_len - prayer_limit)
+    evening_prayer_trimmed = trim_to_limit(evening_prayer_escaped, prayer_limit)
+    reflection_trimmed = trim_to_limit(reflection_prompt_escaped, reflection_limit)
+
+    caption = f"{base_prefix}{evening_prayer_trimmed}{reflection_header}{reflection_trimmed}"
     caption = trim_to_limit(caption, MAX_PHOTO_CAPTION_LEN)
     
     # Выбираем случайное изображение (используем те же изображения, что и для дневного уведомления)
