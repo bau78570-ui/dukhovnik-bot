@@ -18,13 +18,57 @@ from aiogram.enums import ParseMode
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from html import escape
 
-from core.content_library import daily_quotes, fasting_content, reading_plans, daily_words # Добавляем daily_words
+from core.content_library import daily_quotes, fasting_content, reading_plans, daily_words, morning_messages # Добавляем daily_words
 from core.user_database import user_db, get_all_users_with_namedays
 from core.content_sender import send_content_message
 from core.calendar_data import fetch_and_cache_calendar_data
 from core.ai_interaction import get_ai_response # Импортируем для AI-генерации
 from core.subscription_checker import is_premium # Импортируем для проверки премиум доступа
-from utils.html_parser import convert_markdown_to_html # Импортируем для преобразования markdown в HTML
+
+MAX_PHOTO_CAPTION_LEN = 1024
+
+def trim_to_limit(text: str, limit: int) -> str:
+    if len(text) <= limit:
+        return text
+    trimmed = text[:limit].rstrip()
+    return trimmed.rsplit(' ', 1)[0] if ' ' in trimmed else trimmed
+
+def is_ai_error(text: str | None) -> bool:
+    if not text:
+        return True
+    lowered = text.strip().lower()
+    return lowered.startswith("ошибка") or lowered.startswith("произошла ошибка")
+
+def pick_daily_word_image_filename() -> str | None:
+    images_dir = os.path.join('assets', 'images', 'daily_word')
+    if not os.path.exists(images_dir):
+        return None
+    image_files = [f for f in os.listdir(images_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+    return random.choice(image_files) if image_files else None
+
+def get_morning_fallback_message(target_date: date) -> tuple[str, str]:
+    if not morning_messages:
+        return (
+            "Господи, благослови меня на день грядущий и сохрани в мире сердца.",
+            "Сегодня старайся хранить мир и творить добро без лишних слов."
+        )
+    index = target_date.timetuple().tm_yday % len(morning_messages)
+    entry = morning_messages[index]
+    return entry["prayer"], entry["exhortation"]
+
+def parse_morning_ai_response(text: str) -> tuple[str, str] | None:
+    if not text:
+        return None
+    prayer_match = re.search(r'(?is)молитва\s*[:\-]\s*(.+?)(?:\n\s*напутствие\s*[:\-]\s*|$)', text)
+    exhort_match = re.search(r'(?is)напутствие\s*[:\-]\s*(.+)$', text)
+    if prayer_match and exhort_match:
+        return prayer_match.group(1).strip(), exhort_match.group(1).strip()
+    return None
+
+def sanitize_plain_text(text: str) -> str:
+    if not text:
+        return ""
+    return re.sub(r'<[^>]+>', '', text).strip()
 
 async def get_calendar_theme_from_ical(ical_url: str) -> str | None:
     """
@@ -150,17 +194,50 @@ async def send_morning_notification(bot: Bot):
                 formatted_thoughts.append(f"✨ <i>{cleaned_thought.strip()}</i>\n\n")
         theophan_message_text = header + "".join(formatted_thoughts).strip()
     else:
-        theophan_message_text = (
-            "📖 <b>Мысли Святителя Феофана Затворника на каждый день года:</b>\n"
-            "Нет мыслей на этот день."
-        )
+        theophan_message_text = None
+
+    # Определяем тему дня для контекста утреннего напутствия
+    azbyka_api_key = os.getenv("AZBYKA_API_KEY")
+    ical_url = os.getenv("ICAL_URL")
+    morning_theme = None
+    if azbyka_api_key:
+        morning_theme, _ = await get_calendar_theme_from_azbyka(azbyka_api_key)
+    if not morning_theme and ical_url:
+        morning_theme = await get_calendar_theme_from_ical(ical_url)
+
+    # Генерируем утреннюю молитву и напутствие
+    morning_prayer, morning_exhortation = get_morning_fallback_message(today.date())
+    morning_prompt = (
+        "Составь утреннее приветствие для православного бота.\n"
+        "Структура ответа: \n"
+        "Молитва: <краткая молитва в каноническом православном стиле, как из молитвослова, 2-4 предложения>\n"
+        "Напутствие: <глубокое напутствие на день, 3-5 предложений, связь с Писанием, церковной жизнью или святым>"
+        f"{' Учитывай тему дня: ' + morning_theme + '.' if morning_theme else ''}\n"
+        "Общий объем 700-900 символов. Без эмодзи, без списков."
+    )
+    try:
+        ai_morning = await get_ai_response(morning_prompt)
+        if ai_morning and not is_ai_error(ai_morning):
+            parsed = parse_morning_ai_response(ai_morning)
+            if parsed:
+                morning_prayer, morning_exhortation = parsed
+    except Exception as e:
+        logging.error(f"Ошибка при генерации утреннего текста через AI: {e}")
 
     # Приветствие с изображением
+    morning_prayer_clean = sanitize_plain_text(morning_prayer)
+    morning_exhortation_clean = sanitize_plain_text(morning_exhortation)
     greeting_text = (
         "🌅 <b>Доброе утро!</b>\n\n"
-        "Помолимся на день грядущий. Пусть он будет благословенным."
+        "🙏 <b>Утренняя молитва:</b>\n"
+        f"{morning_prayer_clean}\n\n"
+        "💡 <b>Напутствие на день:</b>\n"
+        f"{morning_exhortation_clean}"
     )
-    greeting_image = "logo.png"
+    greeting_text = trim_to_limit(greeting_text, MAX_PHOTO_CAPTION_LEN)
+
+    morning_image_filename = pick_daily_word_image_filename()
+    greeting_image = f"daily_word/{morning_image_filename}" if morning_image_filename else "logo.png"
 
     # Отправляем уведомления пользователям
     user_ids = list(user_db.keys())
@@ -188,11 +265,12 @@ async def send_morning_notification(bot: Bot):
                         image_name=image_url
                     )
 
-                    await send_content_message(
-                        bot=bot,
-                        chat_id=user_id,
-                        text=theophan_message_text
-                    )
+                    if theophan_message_text:
+                        await send_content_message(
+                            bot=bot,
+                            chat_id=user_id,
+                            text=theophan_message_text
+                        )
 
                     sent_count += 1
                     logging.info(f"Утренние уведомления отправлены пользователю {user_id} (статус: {status})")
@@ -234,56 +312,56 @@ async def send_afternoon_notification(bot: Bot):
     except Exception as e:
         logging.error(f"ERROR: Ошибка при выборе слова дня из daily_words для дневной рассылки: {e}")
     
-    # Генерируем AI-размышление (до 200 символов)
+    # Генерируем AI-размышление (почти до лимита Telegram)
     ai_reflection = base_reflection
     try:
         theme_context = f" и темы дня '{theme}'" if theme else ""
         prompt = (
-            f"На основе стиха _{scripture}_{theme_context}, "
-            "напиши очень краткое (до 200 символов) вдохновляющее размышление в позитивном стиле "
-            "(Норман Пил, православный контекст). Сделай акцент на практическом применении "
-            "этой мысли в сегодняшнем дне."
+            f"На основе стиха \"{scripture}\"{theme_context} напиши вдохновляющее размышление "
+            "в православном стиле: глубоко, тепло, с вниманием к сердцу. "
+            "Объем 700-900 символов. 2-3 абзаца, без списков, без эмодзи. "
+            "Свяжи мысль со Священным Писанием и простым шагом на сегодня."
         )
         logging.info(f"Сформирован промт для AI в дневной рассылке: {prompt[:100]}...")
         ai_response = await get_ai_response(prompt)
-        if ai_response:
-            # Ограничиваем до 200 символов
-            ai_reflection = ai_response[:200].rsplit(' ', 1)[0] if len(ai_response) > 200 else ai_response
+        if ai_response and not is_ai_error(ai_response):
+            ai_reflection = ai_response
             logging.info("Получен AI-ответ для дневной рассылки.")
         else:
             logging.warning("WARNING: AI не сгенерировал размышление для дневной рассылки. Используем базовое.")
     except Exception as e:
         logging.error(f"ERROR: Ошибка при генерации AI-размышления в дневной рассылке: {e}. Используем базовое.")
     
-    # Преобразуем markdown в HTML
-    ai_reflection_html = convert_markdown_to_html(ai_reflection)
-    
     # Формируем сообщение (экранируем все пользовательские данные)
     scripture_escaped = escape(scripture) if scripture else ""
     source_escaped = escape(source) if source else ""
-    caption = (
-        f"📖 <b>Слово Дня</b>\n\n"
+    base_caption = (
+        "📖 <b>Слово Дня</b>\n\n"
         f"<i>{scripture_escaped}</i>\n"
         f"<b>Источник:</b> {source_escaped}\n\n"
-        f"{ai_reflection_html}\n\n"
-        f"#Православие #СловоДня"
     )
+    hashtags = "#Православие #СловоДня"
+    available_len = MAX_PHOTO_CAPTION_LEN - len(base_caption) - len("\n\n") - len(hashtags)
+    ai_reflection_escaped = escape(ai_reflection) if ai_reflection else ""
+    ai_reflection_html = trim_to_limit(ai_reflection_escaped, max(0, available_len)) if ai_reflection_escaped else ""
+    caption = (
+        f"{base_caption}"
+        f"{ai_reflection_html}\n\n"
+        f"{hashtags}"
+    )
+    caption = trim_to_limit(caption, MAX_PHOTO_CAPTION_LEN)
     
     # Выбираем случайное изображение
-    daily_word_images_path = 'assets/images/daily_word/'
-    fallback_image_path = 'assets/images/logo.png'
+    daily_word_images_path = os.path.join('assets', 'images', 'daily_word')
+    fallback_image_path = os.path.join('assets', 'images', 'logo.png')
     image_to_send = fallback_image_path
     try:
-        if os.path.exists(daily_word_images_path) and os.listdir(daily_word_images_path):
-            image_files = [f for f in os.listdir(daily_word_images_path) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
-            if image_files:
-                random_image = random.choice(image_files)
-                image_to_send = os.path.join(daily_word_images_path, random_image)
-                logging.info(f"Выбрано изображение для дневной рассылки: {image_to_send}")
-            else:
-                logging.warning(f"WARNING: В папке {daily_word_images_path} нет подходящих изображений. Используется запасное.")
+        image_filename = pick_daily_word_image_filename()
+        if image_filename:
+            image_to_send = os.path.join(daily_word_images_path, image_filename)
+            logging.info(f"Выбрано изображение для дневной рассылки: {image_to_send}")
         else:
-            logging.warning(f"WARNING: Папка {daily_word_images_path} не найдена или пуста. Используется запасное изображение.")
+            logging.warning(f"WARNING: В папке {daily_word_images_path} нет подходящих изображений. Используется запасное.")
     except Exception as e:
         logging.error(f"ERROR: Ошибка при выборе изображения для дневной рассылки: {e}. Используется запасное.")
     
@@ -314,20 +392,22 @@ async def send_evening_notification(bot: Bot):
     """
     logging.info("Начало отправки вечерних уведомлений")
     
-    # Генерируем вечернюю молитву через AI (100-150 символов)
+    # Генерируем вечернюю молитву через AI (почти до лимита Telegram)
     evening_prayer_prompt = (
-        "Напиши очень краткую (1 абзац, 100-150 символов) вечернюю молитву в позитивном стиле "
-        "Нормана Пила с православным контекстом. Молитва должна быть спокойной, благодарственной, "
-        "на покой и рефлексию. Используй современный русский язык, без архаики. "
-        "Акцент на благодарности за день и просьбе о покое на ночь."
+        "Напиши вечернюю молитву в православном стиле: глубокую, спокойную, благодарственную, "
+        "с покаянной ноткой и прошением о мире на ночь. Объем 700-900 символов. "
+        "2-3 абзаца, без списков, без эмодзи. Современный русский язык."
     )
     
-    evening_prayer = "Господи, благодарю Тебя за этот день. Дай мне покой и мир на ночь."
+    evening_prayer = (
+        "Господи, благодарю Тебя за этот день и за все, что Ты послал мне. "
+        "Прости все, в чем я согрешил словом, делом и мыслью. "
+        "Даруй мне мир сердца и покой на эту ночь."
+    )
     try:
         ai_prayer = await get_ai_response(evening_prayer_prompt)
-        if ai_prayer:
-            # Ограничиваем молитву до 150 символов
-            evening_prayer = ai_prayer[:150].rsplit(' ', 1)[0] if len(ai_prayer) > 150 else ai_prayer
+        if ai_prayer and not is_ai_error(ai_prayer):
+            evening_prayer = ai_prayer
             logging.info("Вечерняя молитва сгенерирована через AI")
         else:
             logging.warning("AI не сгенерировал вечернюю молитву, используется запасная")
@@ -336,27 +416,27 @@ async def send_evening_notification(bot: Bot):
     
     # Формируем финальное сообщение (экранируем пользовательские данные)
     evening_prayer_escaped = escape(evening_prayer) if evening_prayer else ""
-    caption = (
-        f"🌙 <b>Добрый вечер!</b>\n\n"
-        f"🙏 <b>Вечерняя молитва:</b>\n{evening_prayer_escaped}\n\n"
-        f"💭 <b>Что сегодня принесло радость?</b> Поделитесь в чате!"
+    base_caption = (
+        "🌙 <b>Добрый вечер!</b>\n\n"
+        "🙏 <b>Вечерняя молитва:</b>\n"
     )
+    footer = "\n\n💭 <b>Что сегодня принесло радость?</b> Поделитесь в чате!"
+    available_len = MAX_PHOTO_CAPTION_LEN - len(base_caption) - len(footer)
+    evening_prayer_trimmed = trim_to_limit(evening_prayer_escaped, max(0, available_len))
+    caption = f"{base_caption}{evening_prayer_trimmed}{footer}"
+    caption = trim_to_limit(caption, MAX_PHOTO_CAPTION_LEN)
     
     # Выбираем случайное изображение (используем те же изображения, что и для дневного уведомления)
-    daily_word_images_path = 'assets/images/daily_word/'
-    fallback_image_path = 'assets/images/logo.png'
+    daily_word_images_path = os.path.join('assets', 'images', 'daily_word')
+    fallback_image_path = os.path.join('assets', 'images', 'logo.png')
     image_to_send = fallback_image_path
     try:
-        if os.path.exists(daily_word_images_path) and os.listdir(daily_word_images_path):
-            image_files = [f for f in os.listdir(daily_word_images_path) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
-            if image_files:
-                random_image = random.choice(image_files)
-                image_to_send = os.path.join(daily_word_images_path, random_image)
-                logging.info(f"Выбрано изображение для вечерней рассылки: {image_to_send}")
-            else:
-                logging.warning(f"WARNING: В папке {daily_word_images_path} нет подходящих изображений. Используется запасное.")
+        image_filename = pick_daily_word_image_filename()
+        if image_filename:
+            image_to_send = os.path.join(daily_word_images_path, image_filename)
+            logging.info(f"Выбрано изображение для вечерней рассылки: {image_to_send}")
         else:
-            logging.warning(f"WARNING: Папка {daily_word_images_path} не найдена или пуста. Используется запасное изображение.")
+            logging.warning(f"WARNING: В папке {daily_word_images_path} нет подходящих изображений. Используется запасное.")
     except Exception as e:
         logging.error(f"ERROR: Ошибка при выборе изображения для вечерней рассылки: {e}. Используется запасное.")
     

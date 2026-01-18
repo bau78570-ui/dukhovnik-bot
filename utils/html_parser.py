@@ -190,7 +190,7 @@ def parse_pravoslavie_calendar_page(html_content: str) -> dict:
                     if p.strip():
                         calendar_data["theophan_thoughts"].append(p.strip())
     else:
-        calendar_data["theophan_thoughts"].append("Нет мыслей на этот день.")
+        calendar_data["theophan_thoughts"] = []
 
     return calendar_data
 

@@ -126,16 +126,6 @@ async def calendar_handler(message: Message, bot: Bot, state: FSMContext):
                 delete_previous=False, # Не удаляем предыдущее сообщение (основной календарь)
                 track_last_message=False
             )
-        else:
-            await send_and_delete_previous(
-                bot=bot,
-                chat_id=chat_id,
-                state=state,
-                text="📖 <b>Мысли Святителя Феофана Затворника на каждый день года:</b>\nНет мыслей на этот день.",
-                show_typing=False,
-                delete_previous=False, # Не удаляем предыдущее сообщение (основной календарь)
-                track_last_message=False
-            )
 
     except Exception as e:
         print(f"ERROR: Непредвиденная ошибка в calendar_handler: {e}")

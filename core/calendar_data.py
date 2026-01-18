@@ -74,7 +74,7 @@ async def fetch_and_cache_calendar_data(date_str: str):
         pravoslavie_data = parse_pravoslavie_calendar_page(pravoslavie_new_style_equivalent_html_content)
         if pravoslavie_data:
             # Приоритет для theophan_thoughts и image_url из pravoslavie.ru
-            if pravoslavie_data.get("theophan_thoughts") and pravoslavie_data["theophan_thoughts"] != ["Нет мыслей на этот день."]:
+            if pravoslavie_data.get("theophan_thoughts"):
                 final_calendar_data["theophan_thoughts"] = pravoslavie_data["theophan_thoughts"]
             if pravoslavie_data.get("image_url"):
                 final_calendar_data["image_url"] = pravoslavie_data["image_url"]
