@@ -6,6 +6,7 @@ from aiogram.types import Message, ReplyKeyboardRemove
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.enums import ParseMode
+from aiogram.exceptions import SkipHandler
 from utils.html_parser import convert_markdown_to_html
 
 # Создаем состояния для диалога поддержки
@@ -31,7 +32,8 @@ async def support_message_received(message: Message, state: FSMContext, bot: Bot
     """Получает сообщение пользователя и пересылает его админу."""
     # Пропускаем команды - они должны обрабатываться другими обработчиками
     if message.text and message.text.strip().startswith('/'):
-        return
+        await state.clear()
+        raise SkipHandler
     
     await state.clear() # Сбрасываем состояние
     
