@@ -49,7 +49,7 @@ async def support_message_received(message: Message, state: FSMContext, bot: Bot
     user_id = message.from_user.id
 
     await bot.forward_message(
-        admin_id,
+        chat_id=admin_id,
         from_chat_id=message.chat.id,
         message_id=message.message_id
     )
