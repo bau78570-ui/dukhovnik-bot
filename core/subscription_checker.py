@@ -158,6 +158,12 @@ class AccessCheckerMiddleware(BaseMiddleware):
         event: Message | CallbackQuery,
         data: Dict[str, Any]
     ) -> Any:
+        # Разрешаем служебные сообщения Telegram Payments без проверки подписки
+        if isinstance(event, Message):
+            if event.successful_payment or event.recurring_payment:
+                logging.info("INFO: Payment message detected. Access GRANTED.")
+                return await handler(event, data)
+
         user_id = event.from_user.id
         print("\n--- Access Check Started ---")
         print(f"User ID: {user_id}, Admin ID from .env: {ADMIN_ID}")
