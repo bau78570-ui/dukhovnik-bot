@@ -1,8 +1,8 @@
 import os
 import logging
-from aiogram import Router, F
+from aiogram import Router, F, Bot
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 from core.user_database import user_db
 from core.subscription_checker import is_subscription_active
 
@@ -12,6 +12,22 @@ router = Router()
 def get_admin_id():
     """Получает ADMIN_ID из переменных окружения (загружает каждый раз)"""
     return os.getenv('ADMIN_ID')
+
+def is_admin(user_id: int) -> bool:
+    ADMIN_ID = get_admin_id()
+    try:
+        return ADMIN_ID is not None and int(ADMIN_ID) == user_id
+    except (ValueError, TypeError):
+        return False
+
+def build_admin_menu() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats")],
+        [InlineKeyboardButton(text="🧾 История поддержки", callback_data="admin_support_history")],
+        [InlineKeyboardButton(text="🏷️ Статус тикета", callback_data="admin_support_status")],
+        [InlineKeyboardButton(text="✉️ Ответить пользователю", callback_data="admin_support_reply")],
+        [InlineKeyboardButton(text="❌ Закрыть меню", callback_data="admin_menu_close")]
+    ])
 
 @router.message(Command("admin"), F.chat.type == "private")
 async def admin_command_handler(message: Message):
@@ -58,13 +74,26 @@ async def admin_command_handler(message: Message):
     
     # Все проверки пройдены - пользователь является администратором
     logging.info(f"Admin access granted for user_id: {user_id}")
-    
+    menu_text = (
+        "🛠️ <b>Admin меню</b>\n\n"
+        "Здесь собраны функции поддержки и статистики.\n"
+        "Выберите действие или используйте команды:\n"
+        "<code>/admin_stats</code>\n"
+        "<code>/support_history &lt;user_id&gt; [limit]</code>\n"
+        "<code>/support_status &lt;user_id&gt; &lt;новый|в работе|закрыт&gt;</code>\n"
+        "<code>/support_reply &lt;user_id&gt; &lt;текст&gt;</code>"
+    )
+    await message.answer(menu_text, parse_mode='HTML', reply_markup=build_admin_menu())
+
+@router.message(Command("admin_stats"), F.chat.type == "private")
+async def admin_stats_handler(message: Message):
+    """Показывает статистику бота (только для админа)."""
+    user_id = message.from_user.id
+    if not is_admin(user_id):
+        await message.answer("Доступ запрещён", parse_mode='HTML')
+        return
     try:
-        # Получаем статистику
-        # 1. Общее количество пользователей (все, кто хотя бы раз нажал /start)
         total_users = len(user_db)
-        
-        # Проверяем, пуста ли база пользователей
         if total_users == 0:
             await message.answer(
                 "📊 <b>Статистика Духовника</b>\n\n"
@@ -73,23 +102,17 @@ async def admin_command_handler(message: Message):
             )
             logging.info("Admin stats: user_db is empty")
             return
-        
-        # 2. Количество активных платных подписок
         active_subscriptions = 0
         for user_id_in_db in user_db.keys():
             if await is_subscription_active(user_id_in_db):
                 active_subscriptions += 1
-        
-        # Формируем сообщение со статистикой
         stats_text = (
             f"📊 <b>Статистика Духовника</b>\n\n"
             f"👥 <b>Всего пользователей:</b> {total_users}\n"
             f"✅ <b>Активных подписок:</b> {active_subscriptions}"
         )
-        
         await message.answer(stats_text, parse_mode='HTML')
         logging.info(f"Admin stats sent: total_users={total_users}, active_subscriptions={active_subscriptions}")
-        
     except Exception as e:
         logging.error(f"Error getting bot stats: {e}", exc_info=True)
         await message.answer(
@@ -97,3 +120,43 @@ async def admin_command_handler(message: Message):
             f"Детали: {str(e)}",
             parse_mode='HTML'
         )
+
+@router.callback_query(F.data == "admin_stats")
+async def admin_stats_callback(query: CallbackQuery):
+    await admin_stats_handler(query.message)
+    await query.answer()
+
+@router.callback_query(F.data == "admin_support_history")
+async def admin_support_history_callback(query: CallbackQuery):
+    if not is_admin(query.from_user.id):
+        await query.answer("Доступ запрещён", show_alert=True)
+        return
+    text = "Команда: /support_history <user_id> [limit]"
+    await query.message.answer(text)
+    await query.answer()
+
+@router.callback_query(F.data == "admin_support_status")
+async def admin_support_status_callback(query: CallbackQuery):
+    if not is_admin(query.from_user.id):
+        await query.answer("Доступ запрещён", show_alert=True)
+        return
+    text = "Команда: /support_status <user_id> <новый|в работе|закрыт>"
+    await query.message.answer(text)
+    await query.answer()
+
+@router.callback_query(F.data == "admin_support_reply")
+async def admin_support_reply_callback(query: CallbackQuery):
+    if not is_admin(query.from_user.id):
+        await query.answer("Доступ запрещён", show_alert=True)
+        return
+    text = "Команда: /support_reply <user_id> <текст ответа>"
+    await query.message.answer(text)
+    await query.answer()
+
+@router.callback_query(F.data == "admin_menu_close")
+async def admin_menu_close_callback(query: CallbackQuery):
+    if not is_admin(query.from_user.id):
+        await query.answer("Доступ запрещён", show_alert=True)
+        return
+    await query.message.edit_reply_markup(reply_markup=None)
+    await query.answer()

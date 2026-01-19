@@ -7,7 +7,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.enums import ParseMode
 from utils.html_parser import convert_markdown_to_html
-from core.support_history import add_support_entry
+from core.support_history import add_support_entry, get_support_history, set_support_status, get_support_status
 
 # Создаем состояния для диалога поддержки
 class SupportState(StatesGroup):
@@ -66,6 +66,7 @@ async def support_message_received(message: Message, state: FSMContext, bot: Bot
     support_message_map[forwarded.message_id] = user_id
     logging.info(f"Сообщение от user_id {user_id} пересланное админу {ADMIN_ID}")
     logging.info(f"Support message from {display_name} (user_id {user_id})")
+    set_support_status(user_id, "новый")
     add_support_entry(
         user_id=user_id,
         direction="user",
@@ -122,6 +123,7 @@ async def support_message_received_non_text(message: Message, state: FSMContext,
     support_message_map[forwarded.message_id] = user_id
     logging.info(f"Сообщение от user_id {user_id} пересланное админу {ADMIN_ID}")
     logging.info(f"Support message from {display_name} (user_id {user_id})")
+    set_support_status(user_id, "новый")
     add_support_entry(
         user_id=user_id,
         direction="user",
@@ -162,6 +164,7 @@ async def support_admin_reply(message: Message, bot: Bot):
         return
     response_text = "Ответ от поддержки: " + (message.text or "")
     await bot.send_message(user_id, response_text)
+    set_support_status(user_id, "в работе")
     add_support_entry(
         user_id=user_id,
         direction="admin",
@@ -197,6 +200,7 @@ async def support_reply_command(message: Message, bot: Bot):
 
     response_text = "Ответ от поддержки: " + parts[2]
     await bot.send_message(user_id, response_text)
+    set_support_status(user_id, "в работе")
     add_support_entry(
         user_id=user_id,
         direction="admin",
@@ -206,3 +210,77 @@ async def support_reply_command(message: Message, bot: Bot):
         first_name=message.from_user.first_name,
         message_id=message.message_id
     )
+
+@router.message(Command("support_history"))
+async def support_history_command(message: Message, bot: Bot):
+    """Показывает историю переписки: /support_history <user_id> [limit]."""
+    ADMIN_ID = os.getenv("ADMIN_ID")
+    if not ADMIN_ID:
+        return
+    try:
+        admin_id = int(ADMIN_ID)
+    except ValueError:
+        return
+    if message.from_user.id != admin_id:
+        return
+
+    parts = message.text.split() if message.text else []
+    if len(parts) < 2:
+        await message.answer("Формат: /support_history <user_id> [limit]")
+        return
+    try:
+        user_id = int(parts[1])
+    except ValueError:
+        await message.answer("Неверный user_id. Формат: /support_history <user_id> [limit]")
+        return
+    limit = 20
+    if len(parts) >= 3:
+        try:
+            limit = max(1, min(100, int(parts[2])))
+        except ValueError:
+            await message.answer("Неверный limit. Пример: /support_history 123456 20")
+            return
+
+    history = get_support_history(user_id)
+    if not history:
+        await message.answer(f"История для user_id {user_id} пуста.")
+        return
+    status = get_support_status(user_id)
+    entries = history[-limit:]
+    lines = [f"🧾 <b>История поддержки</b> (user_id {user_id})", f"🏷️ <b>Статус:</b> {status}", ""]
+    for entry in entries:
+        direction = "Пользователь" if entry.get("direction") == "user" else "Поддержка"
+        text = entry.get("text") or f"[{entry.get('content_type', 'message')}]"
+        timestamp = entry.get("timestamp", "")
+        lines.append(f"• <b>{direction}</b> ({timestamp}): {text}")
+    await message.answer("\n".join(lines), parse_mode=ParseMode.HTML)
+
+@router.message(Command("support_status"))
+async def support_status_command(message: Message, bot: Bot):
+    """Устанавливает статус тикета: /support_status <user_id> <новый|в работе|закрыт>."""
+    ADMIN_ID = os.getenv("ADMIN_ID")
+    if not ADMIN_ID:
+        return
+    try:
+        admin_id = int(ADMIN_ID)
+    except ValueError:
+        return
+    if message.from_user.id != admin_id:
+        return
+
+    parts = message.text.split(maxsplit=2) if message.text else []
+    if len(parts) < 3:
+        await message.answer("Формат: /support_status <user_id> <новый|в работе|закрыт>")
+        return
+    try:
+        user_id = int(parts[1])
+    except ValueError:
+        await message.answer("Неверный user_id. Формат: /support_status <user_id> <новый|в работе|закрыт>")
+        return
+    status = parts[2].strip().lower()
+    allowed = {"новый", "в работе", "закрыт"}
+    if status not in allowed:
+        await message.answer("Статус должен быть: новый | в работе | закрыт")
+        return
+    set_support_status(user_id, status)
+    await message.answer(f"Статус для user_id {user_id} установлен: {status}")
