@@ -160,7 +160,7 @@ class AccessCheckerMiddleware(BaseMiddleware):
     ) -> Any:
         # Разрешаем служебные сообщения Telegram Payments без проверки подписки
         if isinstance(event, Message):
-            if event.successful_payment or event.recurring_payment:
+            if getattr(event, "successful_payment", None) or getattr(event, "recurring_payment", None):
                 logging.info("INFO: Payment message detected. Access GRANTED.")
                 return await handler(event, data)
 
