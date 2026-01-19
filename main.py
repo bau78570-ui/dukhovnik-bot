@@ -9,6 +9,7 @@ if not hasattr(sys, 'real_prefix') and not (hasattr(sys, 'base_prefix') and sys.
 
 from aiogram import Bot, Dispatcher
 from aiogram.types import BotCommand
+from aiogram.types.bot_command_scope_chat import BotCommandScopeChat
 from aiogram.fsm.storage.memory import MemoryStorage # Импортируем MemoryStorage
 from dotenv import load_dotenv
 
@@ -57,6 +58,23 @@ async def set_main_menu(bot: Bot):
         BotCommand(command="/documents", description="📑 Документы")
     ]
     await bot.set_my_commands(main_menu_commands)
+
+    admin_id_raw = os.getenv("ADMIN_ID")
+    try:
+        admin_id = int(admin_id_raw) if admin_id_raw else None
+    except ValueError:
+        admin_id = None
+    if admin_id:
+        admin_menu_commands = main_menu_commands + [
+            BotCommand(command="/admin", description="🛠️ Admin панель"),
+            BotCommand(command="/admin_stats", description="📊 Статистика"),
+            BotCommand(command="/admin_check_subscription", description="🔎 Статус подписки"),
+            BotCommand(command="/admin_activate_premium", description="⭐ Активировать Premium"),
+            BotCommand(command="/support_history", description="🧾 История поддержки"),
+            BotCommand(command="/support_status", description="🏷️ Статус тикета"),
+            BotCommand(command="/support_reply", description="✉️ Ответить пользователю")
+        ]
+        await bot.set_my_commands(admin_menu_commands, scope=BotCommandScopeChat(chat_id=admin_id))
     print("INFO: Main menu commands set successfully.")
 
 # Асинхронная функция для запуска бота
