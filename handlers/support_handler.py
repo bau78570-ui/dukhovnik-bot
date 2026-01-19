@@ -16,9 +16,10 @@ class SupportState(StatesGroup):
 router = Router()
 support_message_map: dict[int, int] = {}
 
-@router.message(Command("support"))
+@router.message(Command("support"), StateFilter("*"))
 async def support_start(message: Message, state: FSMContext):
     """Начинает диалог техподдержки."""
+    await state.clear()
     await state.set_state(SupportState.waiting_for_message)
     text = (
         "📝 **Связь с разработчиком**\n\n"
