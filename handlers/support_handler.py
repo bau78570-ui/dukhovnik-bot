@@ -163,17 +163,21 @@ async def support_admin_reply(message: Message, bot: Bot):
         await bot.send_message(admin_id, "Не удалось определить пользователя для ответа.")
         return
     response_text = "Ответ от поддержки: " + (message.text or "")
-    await bot.send_message(user_id, response_text)
-    set_support_status(user_id, "в работе")
-    add_support_entry(
-        user_id=user_id,
-        direction="admin",
-        text=message.text,
-        content_type=message.content_type,
-        username=message.from_user.username,
-        first_name=message.from_user.first_name,
-        message_id=message.message_id
-    )
+    try:
+        await bot.send_message(user_id, response_text)
+        set_support_status(user_id, "в работе")
+        add_support_entry(
+            user_id=user_id,
+            direction="admin",
+            text=message.text,
+            content_type=message.content_type,
+            username=message.from_user.username,
+            first_name=message.from_user.first_name,
+            message_id=message.message_id
+        )
+    except Exception as e:
+        logging.error(f"Не удалось отправить ответ пользователю {user_id}: {e}")
+        await bot.send_message(admin_id, f"Не удалось отправить ответ пользователю {user_id}. Проверьте ID.")
 
 @router.message(Command("support_reply"))
 async def support_reply_command(message: Message, bot: Bot):
@@ -199,17 +203,22 @@ async def support_reply_command(message: Message, bot: Bot):
         return
 
     response_text = "Ответ от поддержки: " + parts[2]
-    await bot.send_message(user_id, response_text)
-    set_support_status(user_id, "в работе")
-    add_support_entry(
-        user_id=user_id,
-        direction="admin",
-        text=parts[2],
-        content_type=message.content_type,
-        username=message.from_user.username,
-        first_name=message.from_user.first_name,
-        message_id=message.message_id
-    )
+    try:
+        await bot.send_message(user_id, response_text)
+        set_support_status(user_id, "в работе")
+        add_support_entry(
+            user_id=user_id,
+            direction="admin",
+            text=parts[2],
+            content_type=message.content_type,
+            username=message.from_user.username,
+            first_name=message.from_user.first_name,
+            message_id=message.message_id
+        )
+        await message.answer(f"✅ Ответ отправлен пользователю {user_id}.")
+    except Exception as e:
+        logging.error(f"Не удалось отправить ответ пользователю {user_id}: {e}")
+        await message.answer(f"❌ Не удалось отправить ответ пользователю {user_id}. Проверьте ID.")
 
 @router.message(Command("support_history"))
 async def support_history_command(message: Message, bot: Bot):
