@@ -78,6 +78,7 @@ def parse_pravoslavie_calendar_page(html_content: str) -> dict:
     calendar_data = {
         "main_holiday": None,
         "holidays": [],
+        "holidays_meta": [],
         "week_info": "",
         "theophan_thoughts": [],
         "fasting": "Информация о посте не найдена.",
@@ -122,20 +123,56 @@ def parse_pravoslavie_calendar_page(html_content: str) -> dict:
 
     # Праздники определяем по секциям страницы (data-prazdnik)
     section_holidays = []
-    for tag in soup.select('[data-prazdnik] .DNAME a, [data-prazdnik] .DNAME'):
-        name = tag.get_text(strip=True)
+    for p_tag in soup.select('div.DD_TEXT p.DP_TEXT:has([data-prazdnik])'):
+        data_tag = p_tag.select_one('[data-prazdnik]')
+        data_prazdnik = data_tag.get('data-prazdnik') if data_tag else None
+        level = None
+        level_img = p_tag.select_one('img[src*="/T4.gif"], img[src*="/T6.gif"]')
+        if level_img and level_img.get('src'):
+            if "T6.gif" in level_img['src']:
+                level = "T6"
+            elif "T4.gif" in level_img['src']:
+                level = "T4"
+        name_tag = p_tag.select_one('[data-prazdnik] .DNAME a, [data-prazdnik] .DNAME')
+        name = name_tag.get_text(strip=True) if name_tag else ""
         if name:
             section_holidays.append(name)
+            calendar_data["holidays_meta"].append({
+                "title": name,
+                "level": level,
+                "data_prazdnik": data_prazdnik
+            })
     for name in section_holidays:
         if name not in processed_names:
             calendar_data["holidays"].append(name)
             processed_names.add(name)
 
+    def is_holiday_name(name: str) -> bool:
+        holiday_keywords = (
+            "Иконы Божией Матери",
+            "Прп.",
+            "Мч.",
+            "Свт.",
+            "Блж.",
+            "Сщмчч.",
+        )
+        if any(keyword in name for keyword in holiday_keywords):
+            return True
+        if re.search(r"(Господ|Христ|Богородиц|Богоявлен|Рождеств|Пасх|Преображен|Вознесен|Сретен|Успен|Благовещ|Покров|Троиц|Пятидесятниц|Крещени|Вход Господень)", name, re.IGNORECASE):
+            return True
+        lowered = name.strip().lower()
+        if lowered.startswith(("святое ", "светлое ", "собор ", "неделя ")):
+            return True
+        return False
+
     for name in all_potential_names:
         if name not in processed_names:
             # Проверяем, является ли имя праздником (по ключевым словам)
             # или если это имя святого, но оно не является именинами
-            calendar_data["namedays"].append(name)
+            if not section_holidays and is_holiday_name(name):
+                calendar_data["holidays"].append(name)
+            else:
+                calendar_data["namedays"].append(name)
             processed_names.add(name)
 
     # Удаляем дубликаты из holidays и namedays
