@@ -3,8 +3,8 @@ import logging
 from aiogram import Router, F, Bot
 from aiogram.filters import Command
 from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
-from core.user_database import user_db
-from core.subscription_checker import is_subscription_active, activate_premium_subscription
+from core.user_database import user_db, get_user
+from core.subscription_checker import is_subscription_active, activate_premium_subscription, is_trial_active
 
 # Создаем роутер для админ-панели
 router = Router()
@@ -23,6 +23,7 @@ def is_admin(user_id: int) -> bool:
 def build_admin_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats")],
+        [InlineKeyboardButton(text="🔎 Статус подписки", callback_data="admin_check_subscription")],
         [InlineKeyboardButton(text="⭐ Активировать Premium", callback_data="admin_activate_premium")],
         [InlineKeyboardButton(text="🧾 История поддержки", callback_data="admin_support_history")],
         [InlineKeyboardButton(text="🏷️ Статус тикета", callback_data="admin_support_status")],
@@ -83,7 +84,8 @@ async def admin_command_handler(message: Message):
         "<code>/support_history &lt;user_id&gt; [limit]</code>\n"
         "<code>/support_status &lt;user_id&gt; &lt;новый|в работе|закрыт&gt;</code>\n"
         "<code>/support_reply &lt;user_id&gt; &lt;текст&gt;</code>\n"
-        "<code>/admin_activate_premium &lt;user_id&gt; [days]</code>"
+        "<code>/admin_activate_premium &lt;user_id&gt; [days]</code>\n"
+        "<code>/admin_check_subscription &lt;user_id&gt;</code>"
     )
     await message.answer(menu_text, parse_mode='HTML', reply_markup=build_admin_menu())
 
@@ -155,6 +157,15 @@ async def admin_support_reply_callback(query: CallbackQuery):
     await query.message.answer(text)
     await query.answer()
 
+@router.callback_query(F.data == "admin_check_subscription")
+async def admin_check_subscription_callback(query: CallbackQuery):
+    if not is_admin(query.from_user.id):
+        await query.answer("Доступ запрещён", show_alert=True)
+        return
+    text = "Команда: /admin_check_subscription <user_id>"
+    await query.message.answer(text)
+    await query.answer()
+
 @router.callback_query(F.data == "admin_activate_premium")
 async def admin_activate_premium_callback(query: CallbackQuery):
     if not is_admin(query.from_user.id):
@@ -197,6 +208,43 @@ async def admin_activate_premium_handler(message: Message):
 
     success = await activate_premium_subscription(user_id, duration_days=days)
     if success:
+        payment_logger = logging.getLogger("payments")
+        payment_logger.info(f"MANUAL_ACTIVATE user_id={user_id} days={days}")
         await message.answer(f"✅ Premium активирован для user_id {user_id} на {days} дней.")
     else:
         await message.answer("❌ Не удалось активировать Premium. Проверьте логи.")
+
+@router.message(Command("admin_check_subscription"), F.chat.type == "private")
+async def admin_check_subscription_handler(message: Message):
+    """Проверка статуса подписки: /admin_check_subscription <user_id>."""
+    if not is_admin(message.from_user.id):
+        await message.answer("Доступ запрещён", parse_mode='HTML')
+        return
+    parts = message.text.split() if message.text else []
+    if len(parts) < 2:
+        await message.answer("Формат: /admin_check_subscription <user_id>")
+        return
+    try:
+        user_id = int(parts[1])
+    except ValueError:
+        await message.answer("Неверный user_id. Формат: /admin_check_subscription <user_id>")
+        return
+
+    user_data = get_user(user_id)
+    status = user_data.get('status', 'free')
+    trial_active = await is_trial_active(user_id)
+    sub_active = await is_subscription_active(user_id)
+    trial_start = user_data.get('trial_start_date')
+    sub_end = user_data.get('subscription_end_date')
+    trial_start_str = trial_start.isoformat() if hasattr(trial_start, "isoformat") else (str(trial_start) if trial_start else "нет")
+    sub_end_str = sub_end.isoformat() if hasattr(sub_end, "isoformat") else (str(sub_end) if sub_end else "нет")
+
+    text = (
+        f"👤 <b>User ID:</b> {user_id}\n"
+        f"🏷️ <b>Статус:</b> {status}\n"
+        f"🧪 <b>Пробный активен:</b> {trial_active}\n"
+        f"💳 <b>Подписка активна:</b> {sub_active}\n"
+        f"📅 <b>Дата старта пробного:</b> {trial_start_str}\n"
+        f"📆 <b>Дата окончания подписки:</b> {sub_end_str}"
+    )
+    await message.answer(text, parse_mode='HTML')
