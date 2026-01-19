@@ -4,7 +4,7 @@ from aiogram import Router, F, Bot
 from aiogram.filters import Command
 from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 from core.user_database import user_db
-from core.subscription_checker import is_subscription_active
+from core.subscription_checker import is_subscription_active, activate_premium_subscription
 
 # Создаем роутер для админ-панели
 router = Router()
@@ -23,6 +23,7 @@ def is_admin(user_id: int) -> bool:
 def build_admin_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats")],
+        [InlineKeyboardButton(text="⭐ Активировать Premium", callback_data="admin_activate_premium")],
         [InlineKeyboardButton(text="🧾 История поддержки", callback_data="admin_support_history")],
         [InlineKeyboardButton(text="🏷️ Статус тикета", callback_data="admin_support_status")],
         [InlineKeyboardButton(text="✉️ Ответить пользователю", callback_data="admin_support_reply")],
@@ -81,7 +82,8 @@ async def admin_command_handler(message: Message):
         "<code>/admin_stats</code>\n"
         "<code>/support_history &lt;user_id&gt; [limit]</code>\n"
         "<code>/support_status &lt;user_id&gt; &lt;новый|в работе|закрыт&gt;</code>\n"
-        "<code>/support_reply &lt;user_id&gt; &lt;текст&gt;</code>"
+        "<code>/support_reply &lt;user_id&gt; &lt;текст&gt;</code>\n"
+        "<code>/admin_activate_premium &lt;user_id&gt; [days]</code>"
     )
     await message.answer(menu_text, parse_mode='HTML', reply_markup=build_admin_menu())
 
@@ -153,6 +155,15 @@ async def admin_support_reply_callback(query: CallbackQuery):
     await query.message.answer(text)
     await query.answer()
 
+@router.callback_query(F.data == "admin_activate_premium")
+async def admin_activate_premium_callback(query: CallbackQuery):
+    if not is_admin(query.from_user.id):
+        await query.answer("Доступ запрещён", show_alert=True)
+        return
+    text = "Команда: /admin_activate_premium <user_id> [days]"
+    await query.message.answer(text)
+    await query.answer()
+
 @router.callback_query(F.data == "admin_menu_close")
 async def admin_menu_close_callback(query: CallbackQuery):
     if not is_admin(query.from_user.id):
@@ -160,3 +171,32 @@ async def admin_menu_close_callback(query: CallbackQuery):
         return
     await query.message.edit_reply_markup(reply_markup=None)
     await query.answer()
+
+@router.message(Command("admin_activate_premium"), F.chat.type == "private")
+async def admin_activate_premium_handler(message: Message):
+    """Ручная активация премиума: /admin_activate_premium <user_id> [days]."""
+    if not is_admin(message.from_user.id):
+        await message.answer("Доступ запрещён", parse_mode='HTML')
+        return
+    parts = message.text.split() if message.text else []
+    if len(parts) < 2:
+        await message.answer("Формат: /admin_activate_premium <user_id> [days]")
+        return
+    try:
+        user_id = int(parts[1])
+    except ValueError:
+        await message.answer("Неверный user_id. Формат: /admin_activate_premium <user_id> [days]")
+        return
+    days = 30
+    if len(parts) >= 3:
+        try:
+            days = max(1, min(3650, int(parts[2])))
+        except ValueError:
+            await message.answer("Неверное число дней. Пример: /admin_activate_premium 123456 30")
+            return
+
+    success = await activate_premium_subscription(user_id, duration_days=days)
+    if success:
+        await message.answer(f"✅ Premium активирован для user_id {user_id} на {days} дней.")
+    else:
+        await message.answer("❌ Не удалось активировать Premium. Проверьте логи.")

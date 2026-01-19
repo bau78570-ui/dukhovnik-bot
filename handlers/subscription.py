@@ -37,6 +37,12 @@ TELEGRAM_PAYMENTS_TEST = _telegram_payments_test_raw.lower() in ("true", "1", "y
 provider_token = PROVIDER_TOKEN_TEST if TELEGRAM_PAYMENTS_TEST else PROVIDER_TOKEN_LIVE
 
 logger = logging.getLogger(__name__)
+payment_logger = logging.getLogger("payments")
+if not payment_logger.handlers:
+    payment_handler = logging.FileHandler("payments.log", encoding="utf-8")
+    payment_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+    payment_logger.addHandler(payment_handler)
+payment_logger.setLevel(logging.INFO)
 
 # Логируем информацию о токене при загрузке модуля (без полного токена для безопасности)
 if provider_token:
@@ -517,6 +523,7 @@ async def successful_payment_handler(message: Message, bot: Bot):
     payload = payment_info.invoice_payload
     
     logger.info(f"Оплата прошла для user_id={user_id}, invoice_payload={payload}, total_amount={payment_info.total_amount}")
+    payment_logger.info(f"SUCCESS user_id={user_id} amount={payment_info.total_amount} payload={payload}")
     
     try:
         # Парсим количество дней из payload
@@ -564,6 +571,7 @@ async def successful_payment_handler(message: Message, bot: Bot):
             save_user_db()  # Сохраняем изменения
             
             logger.info(f"Premium подписка успешно активирована для user_id={user_id} на {days} дней. Платеж сохранен в историю.")
+            payment_logger.info(f"ACTIVATED user_id={user_id} days={days} end_date={user_data.get('subscription_end_date')}")
             
             await message.answer(
                 f"🎉 <b>Оплата прошла! Premium активирован на {period_text}!</b> 🎉\n\n"
@@ -578,6 +586,7 @@ async def successful_payment_handler(message: Message, bot: Bot):
             )
         else:
             logger.error(f"Ошибка при активации Premium подписки для user_id={user_id}")
+            payment_logger.error(f"FAILED_ACTIVATION user_id={user_id} payload={payload}")
             await message.answer(
                 "❌ <b>Произошла ошибка при активации Premium подписки.</b>\n\n"
                 "Пожалуйста, обратитесь в поддержку: /support",
@@ -586,6 +595,7 @@ async def successful_payment_handler(message: Message, bot: Bot):
             
     except Exception as e:
         logger.error(f"Ошибка при обработке успешного платежа для user_id={user_id}: {e}", exc_info=True)
+        payment_logger.error(f"ERROR_SUCCESS_HANDLER user_id={user_id} payload={payload} error={e}")
         await message.answer(
             "❌ <b>Произошла ошибка при обработке платежа.</b>\n\n"
             "Пожалуйста, обратитесь в поддержку: /support",
@@ -603,6 +613,7 @@ async def recurring_payment_handler(message: Message, bot: Bot):
     recurring_payment = message.recurring_payment
     
     logger.info(f"Автопродление для user_id={user_id}, invoice_payload={recurring_payment.invoice_payload}, total_amount={recurring_payment.total_amount}")
+    payment_logger.info(f"RECURRING user_id={user_id} amount={recurring_payment.total_amount} payload={recurring_payment.invoice_payload}")
     
     try:
         # Продлеваем подписку на 30 дней
@@ -636,6 +647,7 @@ async def recurring_payment_handler(message: Message, bot: Bot):
             save_user_db()  # Сохраняем изменения
             
             logger.info(f"Автопродление успешно выполнено для user_id={user_id}. Подписка продлена на {days} дней.")
+            payment_logger.info(f"RENEWED user_id={user_id} days={days} end_date={user_data.get('subscription_end_date')}")
             
             await message.answer(
                 "🔄 <b>Подписка автоматически продлена на 1 месяц!</b> 🔄\n\n"
@@ -645,6 +657,7 @@ async def recurring_payment_handler(message: Message, bot: Bot):
             )
         else:
             logger.error(f"Ошибка при автопродлении подписки для user_id={user_id}")
+            payment_logger.error(f"FAILED_RENEWAL user_id={user_id} payload={recurring_payment.invoice_payload}")
             await message.answer(
                 "❌ <b>Произошла ошибка при автопродлении подписки.</b>\n\n"
                 "Пожалуйста, обратитесь в поддержку: /support",
@@ -653,6 +666,7 @@ async def recurring_payment_handler(message: Message, bot: Bot):
             
     except Exception as e:
         logger.error(f"Ошибка при обработке автопродления для user_id={user_id}: {e}", exc_info=True)
+        payment_logger.error(f"ERROR_RECURRING_HANDLER user_id={user_id} payload={recurring_payment.invoice_payload} error={e}")
         await message.answer(
             "❌ <b>Произошла ошибка при обработке автопродления.</b>\n\n"
             "Пожалуйста, обратитесь в поддержку: /support",
