@@ -13,6 +13,7 @@ class SupportState(StatesGroup):
     waiting_for_message = State()
 
 router = Router()
+support_message_map: dict[int, int] = {}
 
 @router.message(Command("support"))
 async def support_start(message: Message, state: FSMContext):
@@ -44,11 +45,12 @@ async def support_message_received(message: Message, state: FSMContext, bot: Bot
     display_name = message.from_user.username or message.from_user.first_name or "Аноним"
     user_id = message.from_user.id
 
-    await bot.forward_message(
+    forwarded = await bot.forward_message(
         chat_id=admin_id,
         from_chat_id=message.chat.id,
         message_id=message.message_id
     )
+    support_message_map[forwarded.message_id] = user_id
     logging.info(f"Сообщение от user_id {user_id} пересланное админу {ADMIN_ID}")
     logging.info(f"Support message from {display_name} (user_id {user_id})")
 
@@ -78,11 +80,12 @@ async def support_message_received_non_text(message: Message, state: FSMContext,
     display_name = message.from_user.username or message.from_user.first_name or "Аноним"
     user_id = message.from_user.id
 
-    await bot.forward_message(
+    forwarded = await bot.forward_message(
         chat_id=admin_id,
         from_chat_id=message.chat.id,
         message_id=message.message_id
     )
+    support_message_map[forwarded.message_id] = user_id
     logging.info(f"Сообщение от user_id {user_id} пересланное админу {ADMIN_ID}")
     logging.info(f"Support message from {display_name} (user_id {user_id})")
 
@@ -107,11 +110,11 @@ async def support_admin_reply(message: Message, bot: Bot):
         return
     if not message.reply_to_message:
         return
-    if not message.reply_to_message.from_user or message.reply_to_message.from_user.id != bot.id:
-        return
-    if not message.reply_to_message.forward_from:
+    replied_message_id = message.reply_to_message.message_id
+    user_id = support_message_map.get(replied_message_id)
+    if not user_id and message.reply_to_message.forward_from:
+        user_id = message.reply_to_message.forward_from.id
+    if not user_id:
         await bot.send_message(admin_id, "Не удалось определить пользователя для ответа.")
         return
-
-    user_id = message.reply_to_message.forward_from.id
     await bot.send_message(user_id, "Ответ от поддержки: " + (message.text or ""))
