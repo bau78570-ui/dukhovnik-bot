@@ -7,6 +7,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.enums import ParseMode
 from utils.html_parser import convert_markdown_to_html
+from core.support_history import add_support_entry
 
 # Создаем состояния для диалога поддержки
 class SupportState(StatesGroup):
@@ -44,6 +45,18 @@ async def support_message_received(message: Message, state: FSMContext, bot: Bot
 
     display_name = message.from_user.username or message.from_user.first_name or "Аноним"
     user_id = message.from_user.id
+    username = message.from_user.username
+    first_name = message.from_user.first_name
+
+    admin_ticket_text = (
+        "🆘 <b>Новое обращение в поддержку</b>\n\n"
+        f"👤 <b>Имя:</b> {display_name}\n"
+        f"🔗 <b>Username:</b> {('@' + username) if username else 'не указан'}\n"
+        f"🆔 <b>User ID:</b> {user_id}\n\n"
+        "Ответьте <b>reply</b> на пересланное сообщение или используйте:\n"
+        f"<code>/support_reply {user_id} ваш_ответ</code>"
+    )
+    await bot.send_message(admin_id, admin_ticket_text, parse_mode=ParseMode.HTML)
 
     forwarded = await bot.forward_message(
         chat_id=admin_id,
@@ -53,6 +66,15 @@ async def support_message_received(message: Message, state: FSMContext, bot: Bot
     support_message_map[forwarded.message_id] = user_id
     logging.info(f"Сообщение от user_id {user_id} пересланное админу {ADMIN_ID}")
     logging.info(f"Support message from {display_name} (user_id {user_id})")
+    add_support_entry(
+        user_id=user_id,
+        direction="user",
+        text=message.text,
+        content_type=message.content_type,
+        username=username,
+        first_name=first_name,
+        message_id=message.message_id
+    )
 
     # Отвечаем пользователю
     user_text = (
@@ -79,6 +101,18 @@ async def support_message_received_non_text(message: Message, state: FSMContext,
 
     display_name = message.from_user.username or message.from_user.first_name or "Аноним"
     user_id = message.from_user.id
+    username = message.from_user.username
+    first_name = message.from_user.first_name
+
+    admin_ticket_text = (
+        "🆘 <b>Новое обращение в поддержку</b>\n\n"
+        f"👤 <b>Имя:</b> {display_name}\n"
+        f"🔗 <b>Username:</b> {('@' + username) if username else 'не указан'}\n"
+        f"🆔 <b>User ID:</b> {user_id}\n\n"
+        "Ответьте <b>reply</b> на пересланное сообщение или используйте:\n"
+        f"<code>/support_reply {user_id} ваш_ответ</code>"
+    )
+    await bot.send_message(admin_id, admin_ticket_text, parse_mode=ParseMode.HTML)
 
     forwarded = await bot.forward_message(
         chat_id=admin_id,
@@ -88,6 +122,15 @@ async def support_message_received_non_text(message: Message, state: FSMContext,
     support_message_map[forwarded.message_id] = user_id
     logging.info(f"Сообщение от user_id {user_id} пересланное админу {ADMIN_ID}")
     logging.info(f"Support message from {display_name} (user_id {user_id})")
+    add_support_entry(
+        user_id=user_id,
+        direction="user",
+        text=None,
+        content_type=message.content_type,
+        username=username,
+        first_name=first_name,
+        message_id=message.message_id
+    )
 
     user_text = (
         "✅ **Сообщение отправлено!**\n\n"
@@ -117,4 +160,49 @@ async def support_admin_reply(message: Message, bot: Bot):
     if not user_id:
         await bot.send_message(admin_id, "Не удалось определить пользователя для ответа.")
         return
-    await bot.send_message(user_id, "Ответ от поддержки: " + (message.text or ""))
+    response_text = "Ответ от поддержки: " + (message.text or "")
+    await bot.send_message(user_id, response_text)
+    add_support_entry(
+        user_id=user_id,
+        direction="admin",
+        text=message.text,
+        content_type=message.content_type,
+        username=message.from_user.username,
+        first_name=message.from_user.first_name,
+        message_id=message.message_id
+    )
+
+@router.message(Command("support_reply"))
+async def support_reply_command(message: Message, bot: Bot):
+    """Ответ админу без reply: /support_reply <user_id> <text>."""
+    ADMIN_ID = os.getenv("ADMIN_ID")
+    if not ADMIN_ID:
+        return
+    try:
+        admin_id = int(ADMIN_ID)
+    except ValueError:
+        return
+    if message.from_user.id != admin_id:
+        return
+
+    parts = message.text.split(maxsplit=2) if message.text else []
+    if len(parts) < 3:
+        await message.answer("Формат: /support_reply <user_id> <текст ответа>")
+        return
+    try:
+        user_id = int(parts[1])
+    except ValueError:
+        await message.answer("Неверный user_id. Формат: /support_reply <user_id> <текст ответа>")
+        return
+
+    response_text = "Ответ от поддержки: " + parts[2]
+    await bot.send_message(user_id, response_text)
+    add_support_entry(
+        user_id=user_id,
+        direction="admin",
+        text=parts[2],
+        content_type=message.content_type,
+        username=message.from_user.username,
+        first_name=message.from_user.first_name,
+        message_id=message.message_id
+    )
