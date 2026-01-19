@@ -41,6 +41,17 @@ def trim_to_limit(text: str, limit: int) -> str:
     trimmed = text[:limit].rstrip()
     return trimmed.rsplit(' ', 1)[0] if ' ' in trimmed else trimmed
 
+def trim_to_sentence(text: str, limit: int, min_len: int) -> str:
+    if len(text) <= limit:
+        return text
+    trimmed = text[:limit].rstrip()
+    matches = list(re.finditer(r'[.!?…](?:\s|$)', trimmed))
+    if matches:
+        last_end = matches[-1].end()
+        if last_end >= min_len:
+            return trimmed[:last_end].rstrip()
+    return trim_to_limit(text, limit)
+
 def is_ai_error(text: str | None) -> bool:
     if not text:
         return True
@@ -77,6 +88,12 @@ def sanitize_plain_text(text: str) -> str:
     if not text:
         return ""
     return re.sub(r'<[^>]+>', '', text).strip()
+
+def strip_section_label(text: str, label: str) -> str:
+    if not text:
+        return ""
+    pattern = rf'^\s*{re.escape(label)}\s*[:\-]\s*'
+    return re.sub(pattern, '', text, flags=re.IGNORECASE).strip()
 
 def build_evening_prayer_by_index(index: int) -> str:
     parts = evening_prayer_parts
@@ -266,14 +283,23 @@ async def send_morning_notification(bot: Bot):
         logging.error(f"Ошибка при генерации утреннего текста через AI: {e}")
 
     # Приветствие с изображением
-    morning_prayer_clean = sanitize_plain_text(morning_prayer)
-    morning_exhortation_clean = sanitize_plain_text(morning_exhortation)
-    greeting_text = (
+    morning_prayer_clean = strip_section_label(sanitize_plain_text(morning_prayer), "молитва")
+    morning_exhortation_clean = strip_section_label(sanitize_plain_text(morning_exhortation), "напутствие")
+    greeting_prefix = (
         "🌅 <b>Доброе утро!</b>\n\n"
         "🙏 <b>Утренняя молитва:</b>\n"
-        f"{morning_prayer_clean}\n\n"
-        "💡 <b>Напутствие на день:</b>\n"
-        f"{morning_exhortation_clean}"
+    )
+    greeting_mid = "\n\n💡 <b>Напутствие на день:</b>\n"
+    available_len = MAX_PHOTO_CAPTION_LEN - len(greeting_prefix) - len(greeting_mid)
+    prayer_limit = max(0, int(available_len * 0.45))
+    exhort_limit = max(0, available_len - prayer_limit)
+    prayer_text = trim_to_sentence(morning_prayer_clean, prayer_limit, int(prayer_limit * 0.6))
+    exhort_text = trim_to_sentence(morning_exhortation_clean, exhort_limit, int(exhort_limit * 0.6))
+    greeting_text = (
+        f"{greeting_prefix}"
+        f"{prayer_text}"
+        f"{greeting_mid}"
+        f"{exhort_text}"
     )
     greeting_text = trim_to_limit(greeting_text, MAX_PHOTO_CAPTION_LEN)
 
@@ -384,7 +410,10 @@ async def send_afternoon_notification(bot: Bot):
     hashtags = "#Православие #СловоДня"
     available_len = MAX_PHOTO_CAPTION_LEN - len(base_caption) - len("\n\n") - len(hashtags)
     ai_reflection_escaped = escape(ai_reflection) if ai_reflection else ""
-    ai_reflection_html = trim_to_limit(ai_reflection_escaped, max(0, available_len)) if ai_reflection_escaped else ""
+    if ai_reflection_escaped:
+        ai_reflection_html = trim_to_sentence(ai_reflection_escaped, max(0, available_len), int(available_len * 0.7))
+    else:
+        ai_reflection_html = ""
     caption = (
         f"{base_caption}"
         f"{ai_reflection_html}\n\n"
@@ -467,8 +496,8 @@ async def send_evening_notification(bot: Bot):
     remaining_len = MAX_PHOTO_CAPTION_LEN - len(base_prefix) - len(reflection_header)
     prayer_limit = max(0, int(remaining_len * 0.65))
     reflection_limit = max(0, remaining_len - prayer_limit)
-    evening_prayer_trimmed = trim_to_limit(evening_prayer_escaped, prayer_limit)
-    reflection_trimmed = trim_to_limit(reflection_prompt_escaped, reflection_limit)
+    evening_prayer_trimmed = trim_to_sentence(evening_prayer_escaped, prayer_limit, int(prayer_limit * 0.6))
+    reflection_trimmed = trim_to_sentence(reflection_prompt_escaped, reflection_limit, int(reflection_limit * 0.6))
 
     caption = f"{base_prefix}{evening_prayer_trimmed}{reflection_header}{reflection_trimmed}"
     caption = trim_to_limit(caption, MAX_PHOTO_CAPTION_LEN)
