@@ -120,32 +120,22 @@ def parse_pravoslavie_calendar_page(html_content: str) -> dict:
         calendar_data["holidays"].append(calendar_data["main_holiday"])
         processed_names.add(calendar_data["main_holiday"])
 
-    def is_holiday_name(name: str) -> bool:
-        holiday_keywords = (
-            "Иконы Божией Матери",
-            "Прп.",
-            "Мч.",
-            "Свт.",
-            "Блж.",
-            "Сщмчч.",
-        )
-        if any(keyword in name for keyword in holiday_keywords):
-            return True
-        if re.search(r"(Господ|Христ|Богородиц|Богоявлен|Рождеств|Пасх|Преображен|Вознесен|Сретен|Успен|Благовещ|Покров|Троиц|Пятидесятниц|Крещени|Вход Господень)", name, re.IGNORECASE):
-            return True
-        lowered = name.strip().lower()
-        if lowered.startswith(("святое ", "светлое ", "собор ", "неделя ")):
-            return True
-        return False
+    # Праздники определяем по секциям страницы (data-prazdnik)
+    section_holidays = []
+    for tag in soup.select('[data-prazdnik] .DNAME a, [data-prazdnik] .DNAME'):
+        name = tag.get_text(strip=True)
+        if name:
+            section_holidays.append(name)
+    for name in section_holidays:
+        if name not in processed_names:
+            calendar_data["holidays"].append(name)
+            processed_names.add(name)
 
     for name in all_potential_names:
         if name not in processed_names:
             # Проверяем, является ли имя праздником (по ключевым словам)
             # или если это имя святого, но оно не является именинами
-            if is_holiday_name(name):
-                calendar_data["holidays"].append(name)
-            else:
-                calendar_data["namedays"].append(name)
+            calendar_data["namedays"].append(name)
             processed_names.add(name)
 
     # Удаляем дубликаты из holidays и namedays
