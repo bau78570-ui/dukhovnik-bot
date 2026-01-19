@@ -211,10 +211,14 @@ class AccessCheckerMiddleware(BaseMiddleware):
                     current_state = await state.get_state()
                     # Если пользователь в состоянии поддержки, пропускаем проверку доступа
                     if current_state == SupportState.waiting_for_message:
-                        print(f"INFO: User is in support state. Access GRANTED for support message.")
-                        logging.info(f"INFO: User is in support state. Access GRANTED for support message.")
-                        print("--- Access Check Finished ---\n")
-                        return await handler(event, data)
+                        # Команды должны проходить обычный пайплайн
+                        if event.text and event.text.strip().startswith('/'):
+                            pass
+                        else:
+                            print(f"INFO: User is in support state. Access GRANTED for support message.")
+                            logging.info(f"INFO: User is in support state. Access GRANTED for support message.")
+                            print("--- Access Check Finished ---\n")
+                            return await handler(event, data)
                 except Exception as e:
                     logging.warning(f"WARNING: Could not get FSM state: {e}")
         
