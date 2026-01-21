@@ -301,7 +301,6 @@ async def send_morning_notification(bot: Bot):
         f"{greeting_mid}"
         f"{exhort_text}"
     )
-    greeting_text = trim_to_limit(greeting_text, MAX_PHOTO_CAPTION_LEN)
 
     morning_image_filename = pick_daily_word_image_filename()
     greeting_image = f"daily_word/{morning_image_filename}" if morning_image_filename else "logo.png"
@@ -419,7 +418,6 @@ async def send_afternoon_notification(bot: Bot):
         f"{ai_reflection_html}\n\n"
         f"{hashtags}"
     )
-    caption = trim_to_limit(caption, MAX_PHOTO_CAPTION_LEN)
     
     # Выбираем случайное изображение
     daily_word_images_path = os.path.join('assets', 'images', 'daily_word')
@@ -500,7 +498,6 @@ async def send_evening_notification(bot: Bot):
     reflection_trimmed = trim_to_sentence(reflection_prompt_escaped, reflection_limit, int(reflection_limit * 0.6))
 
     caption = f"{base_prefix}{evening_prayer_trimmed}{reflection_header}{reflection_trimmed}"
-    caption = trim_to_limit(caption, MAX_PHOTO_CAPTION_LEN)
     
     # Выбираем случайное изображение (используем те же изображения, что и для дневного уведомления)
     daily_word_images_path = os.path.join('assets', 'images', 'daily_word')
