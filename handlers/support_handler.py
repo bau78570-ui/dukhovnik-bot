@@ -1,5 +1,6 @@
 import os
 import logging
+import asyncio
 from aiogram import Router, F, Bot
 from aiogram.filters import Command, StateFilter
 from aiogram.types import Message, ReplyKeyboardRemove
@@ -49,34 +50,40 @@ async def support_message_received(message: Message, state: FSMContext, bot: Bot
     username = message.from_user.username
     first_name = message.from_user.first_name
 
-    admin_ticket_text = (
-        "🆘 <b>Новое обращение в поддержку</b>\n\n"
-        f"👤 <b>Имя:</b> {display_name}\n"
-        f"🔗 <b>Username:</b> {('@' + username) if username else 'не указан'}\n"
-        f"🆔 <b>User ID:</b> {user_id}\n\n"
-        "Ответьте <b>reply</b> на пересланное сообщение или используйте:\n"
-        f"<code>/support_reply {user_id} ваш_ответ</code>"
-    )
-    await bot.send_message(admin_id, admin_ticket_text, parse_mode=ParseMode.HTML)
+    async def process_support_message():
+        try:
+            admin_ticket_text = (
+                "🆘 <b>Новое обращение в поддержку</b>\n\n"
+                f"👤 <b>Имя:</b> {display_name}\n"
+                f"🔗 <b>Username:</b> {('@' + username) if username else 'не указан'}\n"
+                f"🆔 <b>User ID:</b> {user_id}\n\n"
+                "Ответьте <b>reply</b> на пересланное сообщение или используйте:\n"
+                f"<code>/support_reply {user_id} ваш_ответ</code>"
+            )
+            await bot.send_message(admin_id, admin_ticket_text, parse_mode=ParseMode.HTML)
 
-    forwarded = await bot.forward_message(
-        chat_id=admin_id,
-        from_chat_id=message.chat.id,
-        message_id=message.message_id
-    )
-    support_message_map[forwarded.message_id] = user_id
-    logging.info(f"Сообщение от user_id {user_id} пересланное админу {ADMIN_ID}")
-    logging.info(f"Support message from {display_name} (user_id {user_id})")
-    set_support_status(user_id, "новый")
-    add_support_entry(
-        user_id=user_id,
-        direction="user",
-        text=message.text,
-        content_type=message.content_type,
-        username=username,
-        first_name=first_name,
-        message_id=message.message_id
-    )
+            forwarded = await bot.forward_message(
+                chat_id=admin_id,
+                from_chat_id=message.chat.id,
+                message_id=message.message_id
+            )
+            support_message_map[forwarded.message_id] = user_id
+            logging.info(f"Сообщение от user_id {user_id} пересланное админу {ADMIN_ID}")
+            logging.info(f"Support message from {display_name} (user_id {user_id})")
+            set_support_status(user_id, "новый")
+            add_support_entry(
+                user_id=user_id,
+                direction="user",
+                text=message.text,
+                content_type=message.content_type,
+                username=username,
+                first_name=first_name,
+                message_id=message.message_id
+            )
+        except Exception as e:
+            logging.error(f"Ошибка при обработке сообщения поддержки для user_id {user_id}: {e}")
+
+    asyncio.create_task(process_support_message())
 
     # Отвечаем пользователю
     user_text = (
@@ -106,34 +113,40 @@ async def support_message_received_non_text(message: Message, state: FSMContext,
     username = message.from_user.username
     first_name = message.from_user.first_name
 
-    admin_ticket_text = (
-        "🆘 <b>Новое обращение в поддержку</b>\n\n"
-        f"👤 <b>Имя:</b> {display_name}\n"
-        f"🔗 <b>Username:</b> {('@' + username) if username else 'не указан'}\n"
-        f"🆔 <b>User ID:</b> {user_id}\n\n"
-        "Ответьте <b>reply</b> на пересланное сообщение или используйте:\n"
-        f"<code>/support_reply {user_id} ваш_ответ</code>"
-    )
-    await bot.send_message(admin_id, admin_ticket_text, parse_mode=ParseMode.HTML)
+    async def process_support_message():
+        try:
+            admin_ticket_text = (
+                "🆘 <b>Новое обращение в поддержку</b>\n\n"
+                f"👤 <b>Имя:</b> {display_name}\n"
+                f"🔗 <b>Username:</b> {('@' + username) if username else 'не указан'}\n"
+                f"🆔 <b>User ID:</b> {user_id}\n\n"
+                "Ответьте <b>reply</b> на пересланное сообщение или используйте:\n"
+                f"<code>/support_reply {user_id} ваш_ответ</code>"
+            )
+            await bot.send_message(admin_id, admin_ticket_text, parse_mode=ParseMode.HTML)
 
-    forwarded = await bot.forward_message(
-        chat_id=admin_id,
-        from_chat_id=message.chat.id,
-        message_id=message.message_id
-    )
-    support_message_map[forwarded.message_id] = user_id
-    logging.info(f"Сообщение от user_id {user_id} пересланное админу {ADMIN_ID}")
-    logging.info(f"Support message from {display_name} (user_id {user_id})")
-    set_support_status(user_id, "новый")
-    add_support_entry(
-        user_id=user_id,
-        direction="user",
-        text=None,
-        content_type=message.content_type,
-        username=username,
-        first_name=first_name,
-        message_id=message.message_id
-    )
+            forwarded = await bot.forward_message(
+                chat_id=admin_id,
+                from_chat_id=message.chat.id,
+                message_id=message.message_id
+            )
+            support_message_map[forwarded.message_id] = user_id
+            logging.info(f"Сообщение от user_id {user_id} пересланное админу {ADMIN_ID}")
+            logging.info(f"Support message from {display_name} (user_id {user_id})")
+            set_support_status(user_id, "новый")
+            add_support_entry(
+                user_id=user_id,
+                direction="user",
+                text=None,
+                content_type=message.content_type,
+                username=username,
+                first_name=first_name,
+                message_id=message.message_id
+            )
+        except Exception as e:
+            logging.error(f"Ошибка при обработке сообщения поддержки для user_id {user_id}: {e}")
+
+    asyncio.create_task(process_support_message())
 
     user_text = (
         "✅ **Сообщение отправлено!**\n\n"
