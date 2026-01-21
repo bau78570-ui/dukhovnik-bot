@@ -118,7 +118,22 @@ async def admin_stats_handler(message: Message):
             # Проверяем активную подписку
             if await is_subscription_active(user_id_in_db):
                 sub_end = user_data.get('subscription_end_date')
-                sub_end_str = sub_end.strftime('%d.%m.%Y') if hasattr(sub_end, 'strftime') else str(sub_end)
+                
+                # Форматируем дату с обработкой как datetime, так и ISO строк
+                if hasattr(sub_end, 'strftime'):
+                    # Это datetime объект
+                    sub_end_str = sub_end.strftime('%d.%m.%Y')
+                elif isinstance(sub_end, str):
+                    # Это строка, пытаемся распарсить ISO формат
+                    try:
+                        sub_end_dt = datetime.fromisoformat(sub_end)
+                        sub_end_str = sub_end_dt.strftime('%d.%m.%Y')
+                    except (ValueError, TypeError):
+                        # Если не удалось распарсить, оставляем как есть
+                        sub_end_str = sub_end
+                else:
+                    # Неизвестный формат
+                    sub_end_str = str(sub_end) if sub_end else "нет данных"
                 
                 # Определяем вид подписки по истории платежей
                 payments = user_data.get('payments', [])
@@ -287,8 +302,30 @@ async def admin_check_subscription_handler(message: Message):
     sub_active = await is_subscription_active(user_id)
     trial_start = user_data.get('trial_start_date')
     sub_end = user_data.get('subscription_end_date')
-    trial_start_str = trial_start.isoformat() if hasattr(trial_start, "isoformat") else (str(trial_start) if trial_start else "нет")
-    sub_end_str = sub_end.isoformat() if hasattr(sub_end, "isoformat") else (str(sub_end) if sub_end else "нет")
+    
+    # Форматируем дату начала пробного периода
+    if hasattr(trial_start, 'strftime'):
+        trial_start_str = trial_start.strftime('%d.%m.%Y %H:%M')
+    elif isinstance(trial_start, str):
+        try:
+            trial_start_dt = datetime.fromisoformat(trial_start)
+            trial_start_str = trial_start_dt.strftime('%d.%m.%Y %H:%M')
+        except (ValueError, TypeError):
+            trial_start_str = trial_start if trial_start else "нет"
+    else:
+        trial_start_str = "нет"
+    
+    # Форматируем дату окончания подписки
+    if hasattr(sub_end, 'strftime'):
+        sub_end_str = sub_end.strftime('%d.%m.%Y %H:%M')
+    elif isinstance(sub_end, str):
+        try:
+            sub_end_dt = datetime.fromisoformat(sub_end)
+            sub_end_str = sub_end_dt.strftime('%d.%m.%Y %H:%M')
+        except (ValueError, TypeError):
+            sub_end_str = sub_end if sub_end else "нет"
+    else:
+        sub_end_str = "нет"
 
     text = (
         f"👤 <b>User ID:</b> {user_id}\n"
