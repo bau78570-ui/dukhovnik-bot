@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 from handlers import start, text_handler, premium_content, free_content, callbacks, settings, nameday, dukhovnik_handler, favorites, support_handler, legal_handler
 from handlers.admin_handler import router as admin_router
 from handlers.subscription import router as subscription_router
-from core.scheduler import scheduler, send_morning_notification, send_afternoon_notification, send_evening_notification # check_namedays
+from core.scheduler import scheduler, send_morning_notification, send_afternoon_notification, send_evening_notification, send_subscription_reminder # check_namedays
 from core.subscription_checker import check_access # Импортируем мидлварь проверки доступа
 from core.user_database import user_db, get_user # Импортируем user_db и get_user
 # from core.calendar_data import cached_calendar_data # Импортируем кэш календаря
@@ -89,17 +89,21 @@ async def main() -> None:
         scheduler.remove_job('afternoon_notification_job')
     if scheduler.get_job('evening_notification_job'):
         scheduler.remove_job('evening_notification_job')
+    if scheduler.get_job('subscription_reminder_job'):
+        scheduler.remove_job('subscription_reminder_job')
 
     # Добавляем задачи в планировщик с явными ID
     scheduler.add_job(send_morning_notification, trigger='cron', hour=8, minute=0, args=[bot], timezone='Europe/Moscow', id='morning_notification_job')
     scheduler.add_job(send_afternoon_notification, trigger='cron', hour=14, minute=0, args=[bot], timezone='Europe/Moscow', id='afternoon_notification_job')
     scheduler.add_job(send_evening_notification, trigger='cron', hour=20, minute=0, args=[bot], timezone='Europe/Moscow', id='evening_notification_job')
+    scheduler.add_job(send_subscription_reminder, trigger='cron', hour=18, minute=0, args=[bot], timezone='Europe/Moscow', id='subscription_reminder_job')
     # scheduler.add_job(check_namedays, trigger='cron', hour=7, minute=0, args=(bot,)) # Запускаем проверку именин в 7 утра
 
     # Логируем информацию о запланированных задачах (без next_run_time, чтобы избежать ошибки)
     logging.info(f"Job 'morning_notification_job' added for 08:00 MSK.")
     logging.info(f"Job 'afternoon_notification_job' added for 14:00 MSK.")
     logging.info(f"Job 'evening_notification_job' added for 20:00 MSK.")
+    logging.info(f"Job 'subscription_reminder_job' added for 18:00 MSK.")
 
     # Запускаем планировщик, если он еще не запущен
     if not scheduler.running:
