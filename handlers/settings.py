@@ -2,8 +2,8 @@ from aiogram import Router, F, Bot
 from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.fsm.context import FSMContext
-from core.content_sender import send_and_delete_previous
+from aiogram.fsm.context import FSMContext # Импортируем FSMContext
+from core.content_sender import send_and_delete_previous # Импортируем новую централизованную функцию
 from core.user_database import get_user, save_user_db
 
 # Создаем роутер для настроек
@@ -12,28 +12,25 @@ router = Router()
 def get_settings_keyboard(user_id: int) -> InlineKeyboardBuilder:
     """Генерирует инлайн-клавиатуру на основе настроек пользователя."""
     user_data = get_user(user_id)
-    notifications = user_data.get('notifications', {})
-    
+    settings = user_data.get('notifications', {'morning': True, 'daily': True, 'evening': True})
     builder = InlineKeyboardBuilder()
     
-    # Кнопка "Утреннее вдохновение"
-    morning_status = "✅" if notifications.get('morning', True) else "❌"
+    # Кнопка "Утреннее уведомление"
+    morning_status = "✅" if settings.get("morning", True) else "❌"
     builder.button(
-        text=f"{morning_status} Утреннее вдохновение",
+        text=f"{morning_status} Утреннее уведомление",
         callback_data="toggle_morning"
     )
-    
-    # Кнопка "Слово дня" (дневное уведомление)
-    daily_status = "✅" if notifications.get('daily', True) else "❌"
+    # Кнопка "Слово Дня"
+    daily_status = "✅" if settings.get("daily", True) else "❌"
     builder.button(
-        text=f"{daily_status} Слово дня",
+        text=f"{daily_status} Слово Дня (14:00)",
         callback_data="toggle_daily"
     )
-    
-    # Кнопка "Вечерние размышления"
-    evening_status = "✅" if notifications.get('evening', True) else "❌"
+    # Кнопка "Вечернее размышление"
+    evening_status = "✅" if settings.get("evening", True) else "❌"
     builder.button(
-        text=f"{evening_status} Вечерние размышления",
+        text=f"{evening_status} Вечернее размышление",
         callback_data="toggle_evening"
     )
     
@@ -43,7 +40,7 @@ def get_settings_keyboard(user_id: int) -> InlineKeyboardBuilder:
         callback_data="open_docs"
     )
     
-    builder.adjust(1)
+    builder.adjust(1) # Все кнопки в один столбец
     return builder
 
 @router.message(Command("settings"))
@@ -72,11 +69,19 @@ async def toggle_settings_handler(callback: CallbackQuery):
     Обрабатывает нажатия на кнопки настроек.
     """
     user_id = callback.from_user.id
-    # Получаем тип настройки из callback_data (например, "morning")
+    # Получаем тип настройки из callback_data (например, "morning", "daily", "evening")
     setting_type = callback.data.split("_")[1]
 
+    # Получаем данные пользователя
+    user_data = get_user(user_id)
+    if 'notifications' not in user_data:
+        user_data['notifications'] = {'morning': True, 'daily': True, 'evening': True}
+    
     # Инвертируем значение настройки (True -> False, False -> True)
-    user_settings[user_id][setting_type] = not user_settings[user_id][setting_type]
+    user_data['notifications'][setting_type] = not user_data['notifications'].get(setting_type, True)
+    
+    # Сохраняем в базу
+    save_user_db()
 
     # Обновляем клавиатуру в существующем сообщении
     await callback.message.edit_reply_markup(
