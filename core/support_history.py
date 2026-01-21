@@ -8,7 +8,7 @@ SUPPORT_HISTORY_FILE = "support_history.json"
 
 support_history: dict[str, list[dict]] = {}
 support_status: dict[str, str] = {}
-_support_lock = threading.Lock()
+_support_lock = threading.RLock()
 
 def load_support_history() -> None:
     global support_history, support_status
