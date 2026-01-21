@@ -65,7 +65,8 @@ async def get_ai_response(user_message: str) -> str:
         "stream": False
     }
 
-    async with aiohttp.ClientSession() as session:
+    timeout = aiohttp.ClientTimeout(total=45)  # Таймаут 45 секунд
+    async with aiohttp.ClientSession(timeout=timeout) as session:
         try:
             async with session.post(url, headers=headers, json=payload) as response:
                 if response.status == 200:
@@ -74,5 +75,7 @@ async def get_ai_response(user_message: str) -> str:
                 else:
                     error_text = await response.text()
                     return f"Ошибка API: {response.status} - {error_text}"
+        except aiohttp.ClientError as e:
+            return f"Ошибка сети при обращении к AI: {e}"
         except Exception as e:
             return f"Произошла ошибка при обращении к AI: {e}"

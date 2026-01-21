@@ -7,6 +7,7 @@ from aiogram.types import Message, CallbackQuery
 from datetime import datetime, timedelta
 from core.user_database import user_db, get_user, save_user_db # Импортируем user_db, get_user и save_user_db
 from handlers.support_handler import SupportState # Импортируем состояние поддержки
+from states import PrayerState # Импортируем состояние молитвы
 
 load_dotenv()
 
@@ -203,13 +204,13 @@ class AccessCheckerMiddleware(BaseMiddleware):
                     print("--- Access Check Finished ---\n")
                     return await handler(event, data)
         
-        # Проверяем состояние FSM - если пользователь в состоянии поддержки, пропускаем проверку доступа
+        # Проверяем состояние FSM - если пользователь в определенных состояниях, пропускаем проверку доступа
         if isinstance(event, Message):
             state = data.get('state')
             if state:
                 try:
                     current_state = await state.get_state()
-                    # Если пользователь в состоянии поддержки, пропускаем проверку доступа
+                    # Если пользователь в состоянии поддержки или молитвы, пропускаем проверку доступа
                     if current_state == SupportState.waiting_for_message:
                         # Команды должны проходить обычный пайплайн
                         if event.text and event.text.strip().startswith('/'):
@@ -219,6 +220,12 @@ class AccessCheckerMiddleware(BaseMiddleware):
                             logging.info(f"INFO: User is in support state. Access GRANTED for support message.")
                             print("--- Access Check Finished ---\n")
                             return await handler(event, data)
+                    elif current_state == PrayerState.waiting_for_details:
+                        # Пользователь уже выбрал тему молитвы, разрешаем отправку деталей
+                        print(f"INFO: User is in prayer details state. Access GRANTED for prayer message.")
+                        logging.info(f"INFO: User is in prayer details state. Access GRANTED for prayer message.")
+                        print("--- Access Check Finished ---\n")
+                        return await handler(event, data)
                 except Exception as e:
                     logging.warning(f"WARNING: Could not get FSM state: {e}")
         

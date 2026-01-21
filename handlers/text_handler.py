@@ -55,6 +55,9 @@ async def handle_text_message(message: Message, bot: Bot, state: FSMContext):
         prayer_topic = user_data.get('prayer_topic')
         user_prayer_details = message.text
 
+        # Показываем индикатор "печатает..."
+        await bot.send_chat_action(chat_id, "typing")
+
         # Формируем специальный промт для get_ai_response
         prompt = (
             f"Сгенерируй текст православной молитвы в позитивном, вдохновляющем стиле (Норман Пил) на тему '{prayer_topic}' "
@@ -66,6 +69,15 @@ async def handle_text_message(message: Message, bot: Bot, state: FSMContext):
         
         # Получаем ответ от AI
         ai_response = await get_ai_response(prompt)
+        
+        # Проверяем, не произошла ли ошибка
+        if not ai_response or ai_response.startswith("Ошибка") or ai_response.startswith("Произошла ошибка"):
+            await message.answer(
+                "😔 Извините, произошла ошибка при генерации молитвы. Попробуйте еще раз через /prayer",
+                parse_mode='HTML'
+            )
+            await state.clear()
+            return
         
         # Сбрасываем состояние пользователя
         await state.clear()
