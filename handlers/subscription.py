@@ -271,17 +271,51 @@ async def send_invoice_for_tariff(bot: Bot, chat_id: int, user_id: int, tariff: 
     if days == 30:
         title = "Premium «Духовник» на 1 месяц"
         label = "Premium 1 месяц"
+        duration_text = "1 месяц"
     elif days == 90:
         title = "Premium «Духовник» на 3 месяца"
         label = "Premium 3 месяца"
+        duration_text = "3 месяца"
     elif days == 365:
         title = "Premium «Духовник» на 1 год"
         label = "Premium 1 год"
+        duration_text = "1 год"
     else:
         title = f"Premium «Духовник» на {days} дней"
         label = f"Premium {days} дней"
+        duration_text = f"{days} дней"
     
     logger.info(f"Попытка отправить invoice для тарифа {tariff} пользователю {user_id}. Режим: {'TEST' if TELEGRAM_PAYMENTS_TEST else 'LIVE'}, amount={amount}, days={days}")
+    
+    # Формируем чек по 54-ФЗ
+    import json
+    provider_data = {
+        "receipt": {
+            "items": [
+                {
+                    "description": f"Premium «Духовник» на {duration_text}",
+                    "quantity": "1",
+                    "amount": {
+                        "value": f"{amount / 100:.2f}",
+                        "currency": "RUB"
+                    },
+                    "vat_code": 6,  # Для самозанятых на НПД (без НДС)
+                    "payment_mode": "full_payment",
+                    "payment_subject": "service"
+                }
+            ]
+        }
+    }
+    
+    # Добавляем email пользователя в чек, если он есть в базе
+    user_data = get_user(user_id)
+    user_email = user_data.get('email')
+    if user_email:
+        provider_data["receipt"]["customer"] = {"email": user_email}
+        logger.info(f"Email пользователя добавлен в чек: {user_email}")
+    
+    provider_data_json = json.dumps(provider_data)
+    logger.info(f"Чек сформирован для user_id={user_id}, provider_data={provider_data_json}")
     
     # Отправляем invoice
     await bot.send_invoice(
@@ -291,7 +325,8 @@ async def send_invoice_for_tariff(bot: Bot, chat_id: int, user_id: int, tariff: 
         payload=payload,
         provider_token=provider_token,
         currency="RUB",
-        prices=[LabeledPrice(label=label, amount=amount)]
+        prices=[LabeledPrice(label=label, amount=amount)],
+        provider_data=provider_data_json
     )
     
     logger.info(f"Invoice отправлен для user_id={user_id}, payload={payload}, tariff={tariff}")
@@ -432,6 +467,36 @@ async def subscribe_callback_handler(callback_query: CallbackQuery, bot: Bot, st
         
         logger.info(f"Попытка отправить invoice пользователю {user_id}. Режим: {'TEST' if TELEGRAM_PAYMENTS_TEST else 'LIVE'}, provider_token (первые 15 символов): {provider_token[:15] if provider_token else 'None'}..., длина токена: {len(provider_token) if provider_token else 0}")
         
+        # Формируем чек по 54-ФЗ
+        import json
+        provider_data = {
+            "receipt": {
+                "items": [
+                    {
+                        "description": "Premium «Духовник» на 1 месяц",
+                        "quantity": "1",
+                        "amount": {
+                            "value": "399.00",
+                            "currency": "RUB"
+                        },
+                        "vat_code": 6,  # Для самозанятых на НПД (без НДС)
+                        "payment_mode": "full_payment",
+                        "payment_subject": "service"
+                    }
+                ]
+            }
+        }
+        
+        # Добавляем email пользователя в чек, если он есть в базе
+        user_data = get_user(user_id)
+        user_email = user_data.get('email')
+        if user_email:
+            provider_data["receipt"]["customer"] = {"email": user_email}
+            logger.info(f"Email пользователя добавлен в чек: {user_email}")
+        
+        provider_data_json = json.dumps(provider_data)
+        logger.info(f"Чек сформирован для user_id={user_id}, provider_data={provider_data_json}")
+        
         # Отправляем invoice
         await bot.send_invoice(
             chat_id=callback_query.message.chat.id,
@@ -440,7 +505,8 @@ async def subscribe_callback_handler(callback_query: CallbackQuery, bot: Bot, st
             payload=payload,
             provider_token=provider_token,
             currency="RUB",
-            prices=[LabeledPrice(label="Premium 30 дней", amount=39900)]  # 399 рублей = 39900 копеек
+            prices=[LabeledPrice(label="Premium 30 дней", amount=39900)],  # 399 рублей = 39900 копеек
+            provider_data=provider_data_json
         )
         
         logger.info(f"Invoice отправлен для user_id={user_id}, payload={payload}")
