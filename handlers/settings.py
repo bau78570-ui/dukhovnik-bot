@@ -1,39 +1,39 @@
-from collections import defaultdict
 from aiogram import Router, F, Bot
 from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.fsm.context import FSMContext # Импортируем FSMContext
-from core.content_sender import send_and_delete_previous # Импортируем новую централизованную функцию
-
-# --- Имитация базы данных настроек ---
-# Используем defaultdict для удобства: если пользователя нет, создаются настройки по умолчанию
-user_settings = defaultdict(lambda: {"morning": True, "day": True, "evening": False})
+from aiogram.fsm.context import FSMContext
+from core.content_sender import send_and_delete_previous
+from core.user_database import get_user, save_user_db
 
 # Создаем роутер для настроек
 router = Router()
 
 def get_settings_keyboard(user_id: int) -> InlineKeyboardBuilder:
     """Генерирует инлайн-клавиатуру на основе настроек пользователя."""
-    settings = user_settings[user_id]
+    user_data = get_user(user_id)
+    notifications = user_data.get('notifications', {})
+    
     builder = InlineKeyboardBuilder()
     
     # Кнопка "Утреннее вдохновение"
-    morning_status = "✅" if settings["morning"] else "❌"
+    morning_status = "✅" if notifications.get('morning', True) else "❌"
     builder.button(
-        text=f"[{morning_status}] Утреннее вдохновение",
+        text=f"{morning_status} Утреннее вдохновение",
         callback_data="toggle_morning"
     )
-    # Кнопка "Дневные рецепты"
-    day_status = "✅" if settings["day"] else "❌"
+    
+    # Кнопка "Слово дня" (дневное уведомление)
+    daily_status = "✅" if notifications.get('daily', True) else "❌"
     builder.button(
-        text=f"[{day_status}] Дневные рецепты",
-        callback_data="toggle_day"
+        text=f"{daily_status} Слово дня",
+        callback_data="toggle_daily"
     )
+    
     # Кнопка "Вечерние размышления"
-    evening_status = "✅" if settings["evening"] else "❌"
+    evening_status = "✅" if notifications.get('evening', True) else "❌"
     builder.button(
-        text=f"[{evening_status}] Вечерние размышления",
+        text=f"{evening_status} Вечерние размышления",
         callback_data="toggle_evening"
     )
     
@@ -43,7 +43,7 @@ def get_settings_keyboard(user_id: int) -> InlineKeyboardBuilder:
         callback_data="open_docs"
     )
     
-    builder.adjust(1) # Все кнопки в один столбец
+    builder.adjust(1)
     return builder
 
 @router.message(Command("settings"))
