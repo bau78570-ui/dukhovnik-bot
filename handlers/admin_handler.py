@@ -1,5 +1,6 @@
 import os
 import logging
+from datetime import datetime
 from aiogram import Router, F, Bot
 from aiogram.filters import Command
 from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
@@ -91,7 +92,7 @@ async def admin_command_handler(message: Message):
 
 @router.message(Command("admin_stats"), F.chat.type == "private")
 async def admin_stats_handler(message: Message):
-    """Показывает статистику бота (только для админа)."""
+    """Показывает статистику бота с детальным списком активных подписок (только для админа)."""
     user_id = message.from_user.id
     if not is_admin(user_id):
         await message.answer("Доступ запрещён", parse_mode='HTML')
@@ -106,17 +107,67 @@ async def admin_stats_handler(message: Message):
             )
             logging.info("Admin stats: user_db is empty")
             return
-        active_subscriptions = 0
+        
+        # Собираем информацию об активных подписках
+        active_subscriptions = []
+        active_trials = 0
+        
         for user_id_in_db in user_db.keys():
+            user_data = user_db[user_id_in_db]
+            
+            # Проверяем активную подписку
             if await is_subscription_active(user_id_in_db):
-                active_subscriptions += 1
+                sub_end = user_data.get('subscription_end_date')
+                sub_end_str = sub_end.strftime('%d.%m.%Y') if hasattr(sub_end, 'strftime') else str(sub_end)
+                
+                # Определяем вид подписки по истории платежей
+                payments = user_data.get('payments', [])
+                subscription_type = "неизвестно"
+                receipt_sent = "нет данных"
+                
+                if payments:
+                    last_payment = payments[-1]
+                    period = last_payment.get('period', 'неизвестно')
+                    subscription_type = period
+                    # Проверяем, был ли чек направлен (если payment содержит payload, значит чек был сформирован)
+                    payload = last_payment.get('payload', '')
+                    receipt_sent = "✅ да" if payload else "❓ не подтверждено"
+                
+                active_subscriptions.append({
+                    'user_id': user_id_in_db,
+                    'end_date': sub_end_str,
+                    'type': subscription_type,
+                    'receipt': receipt_sent
+                })
+            
+            # Подсчитываем активные пробные периоды
+            if await is_trial_active(user_id_in_db):
+                active_trials += 1
+        
+        # Формируем основную статистику
         stats_text = (
             f"📊 <b>Статистика Духовника</b>\n\n"
             f"👥 <b>Всего пользователей:</b> {total_users}\n"
-            f"✅ <b>Активных подписок:</b> {active_subscriptions}"
+            f"✅ <b>Активных подписок:</b> {len(active_subscriptions)}\n"
+            f"🧪 <b>Активных пробных периодов:</b> {active_trials}\n"
         )
+        
+        # Добавляем детальный список активных подписок
+        if active_subscriptions:
+            stats_text += "\n━━━━━━━━━━━━━━━━━━━━━\n"
+            stats_text += "<b>📋 Детали активных подписок:</b>\n\n"
+            
+            for sub in active_subscriptions:
+                stats_text += (
+                    f"👤 <b>ID:</b> <code>{sub['user_id']}</code>\n"
+                    f"📅 <b>До:</b> {sub['end_date']}\n"
+                    f"💳 <b>Тип:</b> {sub['type']}\n"
+                    f"🧾 <b>Чек:</b> {sub['receipt']}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━\n"
+                )
+        
         await message.answer(stats_text, parse_mode='HTML')
-        logging.info(f"Admin stats sent: total_users={total_users}, active_subscriptions={active_subscriptions}")
+        logging.info(f"Admin stats sent: total_users={total_users}, active_subscriptions={len(active_subscriptions)}, active_trials={active_trials}")
     except Exception as e:
         logging.error(f"Error getting bot stats: {e}", exc_info=True)
         await message.answer(
