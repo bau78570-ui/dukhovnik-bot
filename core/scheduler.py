@@ -31,7 +31,7 @@ from core.user_database import user_db, get_all_users_with_namedays
 from core.content_sender import send_content_message
 from core.calendar_data import fetch_and_cache_calendar_data
 from core.ai_interaction import get_ai_response # Импортируем для AI-генерации
-from core.subscription_checker import is_premium, is_trial_active, is_subscription_active # Импортируем для проверки премиум доступа
+from core.subscription_checker import is_premium, is_trial_active, is_subscription_active, is_free_period_active # Импортируем для проверки премиум доступа
 
 MAX_PHOTO_CAPTION_LEN = 1024
 
@@ -312,7 +312,7 @@ async def send_morning_notification(bot: Bot):
         user_data = user_db[user_id]
         status = user_data.get('status', 'free')
 
-        if status in ['free', 'active']:
+        if status in ['free', 'active', 'free_active']:
             setting_enabled = user_data.get('notifications', {}).get('morning', False)
             if setting_enabled:
                 try:
@@ -440,7 +440,7 @@ async def send_afternoon_notification(bot: Bot):
         user_data = user_db[user_id]
         status = user_data.get('status', 'free')
         
-        if status in ['free', 'active']:
+        if status in ['free', 'active', 'free_active']:
             setting_enabled = user_data.get('notifications', {}).get('daily', False)
             if setting_enabled:
                 try:
@@ -520,7 +520,7 @@ async def send_evening_notification(bot: Bot):
         user_data = user_db[user_id]
         status = user_data.get('status', 'free')
         
-        if status in ['free', 'active']:
+        if status in ['free', 'active', 'free_active']:
             setting_enabled = user_data.get('notifications', {}).get('evening', False)
             if setting_enabled:
                 try:
@@ -614,11 +614,12 @@ async def send_subscription_reminder(bot: Bot):
         user_data = user_db[user_id]
         
         # Проверяем, нужно ли отправлять напоминание
-        # Отправляем только если нет активной подписки и пробный период истек
+        # Отправляем только если нет активной подписки, пробного периода или бесплатного периода
         has_trial = await is_trial_active(user_id)
         has_subscription = await is_subscription_active(user_id)
+        has_free_period = await is_free_period_active(user_id)
         
-        if not has_trial and not has_subscription:
+        if not has_trial and not has_subscription and not has_free_period:
             # У пользователя нет ни пробного периода, ни подписки
             try:
                 photo_file = FSInputFile(image_path)

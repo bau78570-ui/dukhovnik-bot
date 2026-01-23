@@ -208,6 +208,7 @@ class AccessCheckerMiddleware(BaseMiddleware):
         # Callback-запросы, которые должны работать без проверки доступа (всегда доступны)
         allowed_callbacks = [
             'start_trial',  # Активация пробного периода
+            'activate_free_period',  # Активация бесплатного периода на 90 дней
             'subscribe_premium',  # Кнопка оформления подписки
             'subscribe_1month', 'subscribe_3month', 'subscribe_12month',  # Выбор тарифа
             'open_docs',  # Открытие документов
@@ -300,9 +301,19 @@ class AccessCheckerMiddleware(BaseMiddleware):
             print("--- Access Check Finished ---\n")
             return await handler(event, data)
         else:
-            print("INFO: Subscription is not active. Proceeding to check for trial activation.")
+            print("INFO: Subscription is not active. Proceeding to next checks.")
         
-        # Шаг 4: Проверка пробного периода - НЕ активируем автоматически
+        # Шаг 4: Проверка на бесплатный период (90 дней)
+        is_free_period = await is_free_period_active(user_id)
+        print(f"INFO: Checking free period status... Result: {is_free_period}")
+        if is_free_period:
+            print("RESULT: Free period is active. Access GRANTED.")
+            print("--- Access Check Finished ---\n")
+            return await handler(event, data)
+        else:
+            print("INFO: Free period is not active. Proceeding to check for trial activation.")
+        
+        # Шаг 5: Проверка пробного периода - НЕ активируем автоматически
         # Пробный период должен активироваться только через кнопку в /start или явный вызов activate_trial()
         user_data = get_user(user_id)
         trial_start = user_data.get('trial_start_date')
