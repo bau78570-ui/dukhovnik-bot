@@ -23,8 +23,10 @@ router = Router()
 def parse_start_params(text: str) -> dict:
     """
     Парсит параметры из команды /start.
-    Формат: /start utm_source=channel1--utm_campaign=christmas--ref=12345
-    или: /start source-channel1-campaign-christmas-ref-12345
+    Поддерживает форматы:
+    - /start utm_source=telegram--utm_campaign=christmas--ref=12345
+    - /start@botname utm_source=telegram--utm_campaign=christmas
+    - /start source-telegram-campaign-christmas-ref-12345
     Возвращает словарь с параметрами.
     """
     params = {}
@@ -32,8 +34,14 @@ def parse_start_params(text: str) -> dict:
     if not text or not text.strip().startswith('/start'):
         return params
     
-    # Убираем "/start " и получаем параметры
-    param_string = text.replace('/start', '').strip()
+    # Убираем "/start" и опционально "@botname" используя regex
+    # Паттерн: /start, затем опционально @имя_бота (буквы, цифры, подчеркивания), затем пробел и параметры
+    match = re.match(r'^/start(?:@[\w-]+)?\s*(.*)', text.strip())
+    
+    if not match:
+        return params
+    
+    param_string = match.group(1).strip()
     
     if not param_string:
         return params
