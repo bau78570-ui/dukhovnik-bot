@@ -230,16 +230,9 @@ async def start_chat_handler(query: CallbackQuery, bot: Bot):
 async def show_calendar_from_onboarding_handler(query: CallbackQuery, bot: Bot):
     """
     Обработчик кнопки "Посмотреть календарь" из онбординга.
-    Перенаправляет на команду /calendar.
+    Отправляет информацию о календаре и предлагает попробовать команду.
     """
     await query.answer()
-    
-    # Импортируем обработчик календаря
-    from handlers.free_content import calendar_handler
-    
-    # Создаем фейковое сообщение для вызова обработчика календаря
-    fake_message = query.message
-    fake_message.from_user = query.from_user
     
     calendar_info = (
         "🗓️ <b>Православный календарь</b>\n\n"
