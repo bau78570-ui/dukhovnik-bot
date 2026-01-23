@@ -13,8 +13,41 @@ load_dotenv()
 
 ADMIN_ID = os.getenv("ADMIN_ID", "")
 TRIAL_DURATION_DAYS = 3
+FREE_PERIOD_DAYS = 90
 
 # --- Функции проверки статусов ---
+async def is_free_period_active(user_id: int) -> bool:
+    """
+    Проверяет активность бесплатного периода на 90 дней.
+    Возвращает True, если бесплатный период активен, False в противном случае.
+    """
+    user_data = get_user(user_id)
+    free_period_start = user_data.get('free_period_start')
+    
+    if free_period_start:
+        # Обрабатываем случай, когда free_period_start хранится как строка
+        if isinstance(free_period_start, str):
+            try:
+                free_period_start = datetime.fromisoformat(free_period_start)
+            except (ValueError, TypeError):
+                logging.warning(f"Не удалось распарсить free_period_start для user_id={user_id}: {free_period_start}")
+                return False
+        
+        # Проверяем, что free_period_start является datetime объектом
+        if isinstance(free_period_start, datetime):
+            free_period_end = free_period_start + timedelta(days=FREE_PERIOD_DAYS)
+            is_active = datetime.now() < free_period_end
+            
+            # Если период истек, обновляем статус
+            if not is_active and user_data.get('status') == 'free_active':
+                user_data['status'] = 'free_limit'
+                save_user_db()
+                logging.info(f"Бесплатный период истек для user_id={user_id}, статус установлен на 'free_limit'")
+            
+            return is_active
+    
+    return False
+
 async def is_trial_active(user_id: int) -> bool:
     """
     Проверяет активность пробного периода пользователя.
@@ -148,9 +181,9 @@ async def is_subscription_active(user_id: int) -> bool:
 
 async def is_premium(user_id: int) -> bool:
     """
-    Проверяет, имеет ли пользователь Premium-доступ (активный пробный период или подписка).
+    Проверяет, имеет ли пользователь Premium-доступ (бесплатный период, пробный период или подписка).
     """
-    return await is_trial_active(user_id) or await is_subscription_active(user_id)
+    return await is_free_period_active(user_id) or await is_trial_active(user_id) or await is_subscription_active(user_id)
 
 class AccessCheckerMiddleware(BaseMiddleware):
     async def __call__(
