@@ -11,7 +11,7 @@ import logging # Импортируем logging
 import asyncio # Импортируем asyncio для задержек
 import os # Импортируем os для ADMIN_ID
 from dotenv import load_dotenv
-from urllib.parse import parse_qs # Для парсинга UTM параметров
+import re # Для парсинга UTM параметров с regex
 
 load_dotenv()
 ADMIN_ID = os.getenv("ADMIN_ID", "")
@@ -23,7 +23,8 @@ router = Router()
 def parse_start_params(text: str) -> dict:
     """
     Парсит параметры из команды /start.
-    Формат: /start utm_source=channel1_utm_campaign=christmas_ref=12345
+    Формат: /start utm_source=channel1--utm_campaign=christmas--ref=12345
+    или: /start source-channel1-campaign-christmas-ref-12345
     Возвращает словарь с параметрами.
     """
     params = {}
@@ -37,14 +38,42 @@ def parse_start_params(text: str) -> dict:
     if not param_string:
         return params
     
-    # Парсим параметры разделенные "_" (Telegram deep links используют "_" вместо "&")
-    # Формат: utm_source=value_utm_campaign=value2
-    parts = param_string.split('_')
+    # Метод 1: Парсим формат key=value с разделителем "--"
+    # Формат: utm_source=telegram--utm_campaign=christmas--ref=12345
+    if '--' in param_string:
+        parts = param_string.split('--')
+        for part in parts:
+            if '=' in part:
+                key, value = part.split('=', 1)
+                params[key.strip()] = value.strip()
     
-    for part in parts:
-        if '=' in part:
-            key, value = part.split('=', 1)
+    # Метод 2: Парсим формат через одинарный дефис (короткий формат)
+    # Формат: source-telegram-campaign-christmas-ref-12345
+    elif '-' in param_string:
+        parts = param_string.split('-')
+        # Обрабатываем пары ключ-значение
+        i = 0
+        while i < len(parts) - 1:
+            key = parts[i].strip()
+            value = parts[i + 1].strip()
+            
+            # Преобразуем короткие ключи в полные UTM ключи
+            if key in ['source', 'medium', 'campaign', 'term', 'content']:
+                key = f'utm_{key}'
+            
             params[key] = value
+            i += 2
+    
+    # Метод 3: Используем regex для поиска всех паттернов key=value
+    # Формат: utm_source=telegram_utm_campaign=christmas (с подчеркиваниями)
+    else:
+        # Ищем все паттерны вида "ключ=значение", где ключ может содержать подчеркивания
+        # Паттерн: буквы/цифры/подчеркивания, затем =, затем значение до следующего ключа или конца
+        pattern = r'([a-zA-Z_][a-zA-Z0-9_]*)=([^=]+?)(?=\s+[a-zA-Z_][a-zA-Z0-9_]*=|$)'
+        matches = re.findall(pattern, param_string)
+        
+        for key, value in matches:
+            params[key.strip()] = value.strip()
     
     return params
 
@@ -97,11 +126,17 @@ async def command_start_handler(message: Message, bot: Bot, state: FSMContext) -
         if referrer_id:
             user_data['referrer_id'] = referrer_id
             # Увеличиваем счетчик рефералов у реферера
-            if referrer_id in user_db:
-                referrer_data = user_db[referrer_id]
-                referrer_data['referrals'] = referrer_data.get('referrals', 0) + 1
-                referrer_data.setdefault('referral_list', []).append(str(user_id))
-                logging.info(f"Реферал: пользователь {user_id} привлечен пользователем {referrer_id}")
+            try:
+                referrer_id_int = int(referrer_id)
+                if referrer_id_int in user_db:
+                    referrer_data = user_db[referrer_id_int]
+                    referrer_data['referrals'] = referrer_data.get('referrals', 0) + 1
+                    referrer_data.setdefault('referral_list', []).append(str(user_id))
+                    logging.info(f"Реферал: пользователь {user_id} привлечен пользователем {referrer_id_int}")
+                else:
+                    logging.warning(f"Реферер {referrer_id} не найден в базе данных")
+            except (ValueError, TypeError):
+                logging.error(f"Некорректный referrer_id: {referrer_id}")
         
         save_user_db()
         
@@ -423,10 +458,13 @@ async def stats_handler(message: Message, bot: Bot):
     stats_text += f"💳 Оплатили подписку: <b>{users_with_subscription}</b>\n"
     stats_text += f"🔗 Пришли по рефералке: <b>{referrals_count}</b>\n"
     
-    # Конверсия в платных
+    # Конверсия в платных (определяем до использования)
+    paid_conversion = 0.0
     if total_users > 0:
         paid_conversion = (users_with_subscription * 100) / total_users
         stats_text += f"📊 Конверсия в платных: <b>{paid_conversion:.2f}%</b>\n"
+    else:
+        stats_text += f"📊 Конверсия в платных: <b>0.00%</b> (нет пользователей)\n"
     
     # Источники трафика
     stats_text += "\n━━━━━━━━━━━━━━━━━━━━━\n"
