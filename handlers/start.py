@@ -9,15 +9,51 @@ from core.user_database import get_user, user_db, save_user_db # Импорти�
 from core.subscription_checker import is_premium # Импортируем is_premium
 import logging # Импортируем logging
 import asyncio # Импортируем asyncio для задержек
+import os # Импортируем os для ADMIN_ID
+from dotenv import load_dotenv
+from urllib.parse import parse_qs # Для парсинга UTM параметров
+
+load_dotenv()
+ADMIN_ID = os.getenv("ADMIN_ID", "")
 
 # Создаем роутер для этого обработчика
 router = Router()
+
+
+def parse_start_params(text: str) -> dict:
+    """
+    Парсит параметры из команды /start.
+    Формат: /start utm_source=channel1_utm_campaign=christmas_ref=12345
+    Возвращает словарь с параметрами.
+    """
+    params = {}
+    
+    if not text or not text.strip().startswith('/start'):
+        return params
+    
+    # Убираем "/start " и получаем параметры
+    param_string = text.replace('/start', '').strip()
+    
+    if not param_string:
+        return params
+    
+    # Парсим параметры разделенные "_" (Telegram deep links используют "_" вместо "&")
+    # Формат: utm_source=value_utm_campaign=value2
+    parts = param_string.split('_')
+    
+    for part in parts:
+        if '=' in part:
+            key, value = part.split('=', 1)
+            params[key] = value
+    
+    return params
 
 @router.message(CommandStart())
 async def command_start_handler(message: Message, bot: Bot, state: FSMContext) -> None:
     """
     Этот обработчик будет срабатывать на команду /start.
     Для новых пользователей показывает 3-сообщение welcome-онбординг.
+    Поддерживает UTM-трекинг и реферальные ссылки.
     """
     # Регистрируем пользователя в базе данных
     user_id = message.from_user.id
@@ -31,13 +67,67 @@ async def command_start_handler(message: Message, bot: Bot, state: FSMContext) -
     
     # Получаем имя пользователя для персонализации
     user_name = message.from_user.first_name or "друг"
+    username = message.from_user.username or ""
+    
+    # Парсим UTM параметры и реферальные ссылки
+    start_params = parse_start_params(message.text)
+    
+    # Сохраняем UTM параметры только для новых пользователей
+    if is_new_user and start_params:
+        utm_source = start_params.get('utm_source', 'direct')
+        utm_medium = start_params.get('utm_medium', '')
+        utm_campaign = start_params.get('utm_campaign', '')
+        utm_term = start_params.get('utm_term', '')
+        utm_content = start_params.get('utm_content', '')
+        referrer_id = start_params.get('ref', '')
+        
+        # Сохраняем UTM данные
+        user_data['utm_source'] = utm_source
+        user_data['utm_medium'] = utm_medium
+        user_data['utm_campaign'] = utm_campaign
+        user_data['utm_term'] = utm_term
+        user_data['utm_content'] = utm_content
+        user_data['first_visit_date'] = datetime.now()
+        
+        # Сохраняем username для контакта
+        if username:
+            user_data['username'] = username
+        
+        # Обрабатываем реферальную ссылку
+        if referrer_id:
+            user_data['referrer_id'] = referrer_id
+            # Увеличиваем счетчик рефералов у реферера
+            if referrer_id in user_db:
+                referrer_data = user_db[referrer_id]
+                referrer_data['referrals'] = referrer_data.get('referrals', 0) + 1
+                referrer_data.setdefault('referral_list', []).append(str(user_id))
+                logging.info(f"Реферал: пользователь {user_id} привлечен пользователем {referrer_id}")
+        
+        save_user_db()
+        
+        # Логирование с UTM данными
+        utm_log = f"utm_source={utm_source}"
+        if utm_campaign:
+            utm_log += f", utm_campaign={utm_campaign}"
+        if utm_medium:
+            utm_log += f", utm_medium={utm_medium}"
+        if referrer_id:
+            utm_log += f", ref={referrer_id}"
+        
+        logging.info(f"Новый пользователь {user_id} (@{username or 'no_username'}) из источника: {utm_log}")
+    elif not is_new_user and not user_data.get('utm_source'):
+        # Для старых пользователей без UTM данных ставим "organic"
+        user_data['utm_source'] = 'organic'
+        if username and not user_data.get('username'):
+            user_data['username'] = username
+        save_user_db()
     
     # Сначала убираем старую клавиатуру (сброс кэша Telegram)
     await message.answer("♻️", reply_markup=ReplyKeyboardRemove())
     
     # === WELCOME-ОНБОРДИНГ ДЛЯ НОВЫХ ПОЛЬЗОВАТЕЛЕЙ ===
     if is_new_user:
-        logging.info(f"Новый пользователь {user_id} ({user_name}), запускаем welcome-онбординг")
+        logging.info(f"Запуск welcome-онбординга для пользователя {user_id} ({user_name})")
         
         # Сообщение 1: Приветствие с изображением
         await bot.send_chat_action(chat_id, "typing")
@@ -246,3 +336,161 @@ async def show_calendar_from_onboarding_handler(query: CallbackQuery, bot: Bot):
     
     await query.message.answer(calendar_info, parse_mode='HTML')
     logging.info(f"Пользователь {query.from_user.id} запросил календарь через онбординг")
+
+
+@router.message(Command("stats"))
+async def stats_handler(message: Message, bot: Bot):
+    """
+    Команда для просмотра статистики (только для администратора).
+    Показывает аналитику по источникам трафика, конверсии и активности.
+    """
+    user_id = message.from_user.id
+    
+    # Проверяем, является ли пользователь администратором
+    if str(user_id) != str(ADMIN_ID):
+        await message.answer("❌ Эта команда доступна только администратору.")
+        logging.warning(f"Попытка доступа к /stats от неавторизованного пользователя {user_id}")
+        return
+    
+    logging.info(f"Админ {user_id} запросил статистику /stats")
+    
+    # Импортируем функции для проверки статусов
+    from core.subscription_checker import is_free_period_active, is_trial_active, is_subscription_active
+    
+    # Собираем статистику
+    total_users = len(user_db)
+    
+    # Статистика по источникам
+    utm_sources = {}
+    utm_campaigns = {}
+    referrals_count = 0
+    users_with_free_period = 0
+    users_with_trial = 0
+    users_with_subscription = 0
+    users_onboarded = 0
+    
+    # Конверсии по источникам
+    source_conversions = {}  # {source: {'total': N, 'free_activated': N, 'paid': N}}
+    
+    for uid, data in user_db.items():
+        # Источники
+        source = data.get('utm_source', 'unknown')
+        campaign = data.get('utm_campaign', 'none')
+        
+        # Подсчет по источникам
+        utm_sources[source] = utm_sources.get(source, 0) + 1
+        
+        # Подсчет по кампаниям
+        if campaign and campaign != 'none':
+            utm_campaigns[campaign] = utm_campaigns.get(campaign, 0) + 1
+        
+        # Инициализация конверсий по источникам
+        if source not in source_conversions:
+            source_conversions[source] = {'total': 0, 'free_activated': 0, 'trial_activated': 0, 'paid': 0}
+        
+        source_conversions[source]['total'] += 1
+        
+        # Рефералы
+        if data.get('referrer_id'):
+            referrals_count += 1
+        
+        # Активации
+        if data.get('free_period_start'):
+            users_with_free_period += 1
+            source_conversions[source]['free_activated'] += 1
+        
+        if data.get('trial_start_date'):
+            users_with_trial += 1
+            source_conversions[source]['trial_activated'] += 1
+        
+        if data.get('subscription_end_date'):
+            users_with_subscription += 1
+            source_conversions[source]['paid'] += 1
+        
+        if data.get('onboarded'):
+            users_onboarded += 1
+    
+    # Формируем текст статистики
+    stats_text = "📊 <b>СТАТИСТИКА БОТА</b>\n\n"
+    
+    # Общая статистика
+    stats_text += "━━━━━━━━━━━━━━━━━━━━━\n"
+    stats_text += "<b>📈 ОБЩИЕ ПОКАЗАТЕЛИ:</b>\n"
+    stats_text += f"👥 Всего пользователей: <b>{total_users}</b>\n"
+    stats_text += f"✅ Прошли онбординг: <b>{users_onboarded}</b> ({users_onboarded*100//total_users if total_users else 0}%)\n"
+    stats_text += f"🎁 Активировали бесплатный период: <b>{users_with_free_period}</b>\n"
+    stats_text += f"🆓 Активировали триал: <b>{users_with_trial}</b>\n"
+    stats_text += f"💳 Оплатили подписку: <b>{users_with_subscription}</b>\n"
+    stats_text += f"🔗 Пришли по рефералке: <b>{referrals_count}</b>\n"
+    
+    # Конверсия в платных
+    if total_users > 0:
+        paid_conversion = (users_with_subscription * 100) / total_users
+        stats_text += f"📊 Конверсия в платных: <b>{paid_conversion:.2f}%</b>\n"
+    
+    # Источники трафика
+    stats_text += "\n━━━━━━━━━━━━━━━━━━━━━\n"
+    stats_text += "<b>🌐 ИСТОЧНИКИ ТРАФИКА:</b>\n\n"
+    
+    # Сортируем источники по количеству пользователей
+    sorted_sources = sorted(utm_sources.items(), key=lambda x: x[1], reverse=True)
+    
+    for source, count in sorted_sources:
+        percentage = (count * 100) / total_users if total_users else 0
+        stats_text += f"📍 <b>{source}</b>: {count} ({percentage:.1f}%)\n"
+        
+        # Конверсии по этому источнику
+        conv = source_conversions.get(source, {})
+        free_conv = (conv.get('free_activated', 0) * 100) / count if count else 0
+        paid_conv = (conv.get('paid', 0) * 100) / count if count else 0
+        
+        stats_text += f"   └ Активировали бесплатный период: {conv.get('free_activated', 0)} ({free_conv:.1f}%)\n"
+        stats_text += f"   └ Оплатили подписку: {conv.get('paid', 0)} ({paid_conv:.1f}%)\n\n"
+    
+    # Кампании
+    if utm_campaigns:
+        stats_text += "━━━━━━━━━━━━━━━━━━━━━\n"
+        stats_text += "<b>🎯 АКТИВНЫЕ КАМПАНИИ:</b>\n\n"
+        
+        sorted_campaigns = sorted(utm_campaigns.items(), key=lambda x: x[1], reverse=True)
+        
+        for campaign, count in sorted_campaigns[:10]:  # Топ-10 кампаний
+            percentage = (count * 100) / total_users if total_users else 0
+            stats_text += f"• <b>{campaign}</b>: {count} ({percentage:.1f}%)\n"
+    
+    # Топ-рефереры
+    top_referrers = []
+    for uid, data in user_db.items():
+        referral_count = data.get('referrals', 0)
+        if referral_count > 0:
+            username = data.get('username', 'no_username')
+            top_referrers.append((uid, username, referral_count))
+    
+    if top_referrers:
+        top_referrers.sort(key=lambda x: x[2], reverse=True)
+        stats_text += "\n━━━━━━━━━━━━━━━━━━━━━\n"
+        stats_text += "<b>🏆 ТОП-5 РЕФЕРЕРОВ:</b>\n\n"
+        
+        for i, (uid, username, count) in enumerate(top_referrers[:5], 1):
+            stats_text += f"{i}. @{username} (ID: {uid}): <b>{count}</b> рефералов\n"
+    
+    # Рекомендации
+    stats_text += "\n━━━━━━━━━━━━━━━━━━━━━\n"
+    stats_text += "<b>💡 РЕКОМЕНДАЦИИ:</b>\n\n"
+    
+    if paid_conversion < 5:
+        stats_text += "⚠️ Конверсия в платных подписчиков низкая. Рекомендуется:\n"
+        stats_text += "   • Усилить напоминания о подписке\n"
+        stats_text += "   • Добавить уникальные функции для платных\n"
+        stats_text += "   • Провести акцию со скидкой\n\n"
+    
+    # Определяем лучший источник по конверсии
+    if source_conversions:
+        best_source = max(source_conversions.items(), 
+                         key=lambda x: x[1].get('paid', 0) / x[1].get('total', 1))
+        stats_text += f"🎯 Лучший источник по платным: <b>{best_source[0]}</b>\n"
+        stats_text += f"   Рекомендуется увеличить инвестиции в этот канал\n"
+    
+    # Отправляем статистику
+    await message.answer(stats_text, parse_mode='HTML')
+    logging.info(f"Статистика отправлена админу {user_id}")

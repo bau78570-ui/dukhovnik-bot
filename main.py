@@ -67,7 +67,8 @@ async def set_main_menu(bot: Bot):
     if admin_id:
         admin_menu_commands = main_menu_commands + [
             BotCommand(command="/admin", description="🛠️ Admin панель"),
-            BotCommand(command="/admin_stats", description="📊 Статистика"),
+            BotCommand(command="/stats", description="📊 Аналитика трафика"),
+            BotCommand(command="/admin_stats", description="📈 Статистика подписок"),
             BotCommand(command="/admin_check_subscription", description="🔎 Статус подписки"),
             BotCommand(command="/admin_activate_premium", description="⭐ Активировать Premium"),
             BotCommand(command="/support_history", description="🧾 История поддержки"),

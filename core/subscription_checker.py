@@ -203,7 +203,7 @@ class AccessCheckerMiddleware(BaseMiddleware):
         print(f"User ID: {user_id}, Admin ID from .env: {ADMIN_ID}")
 
         # Команды, которые должны работать без проверки доступа (всегда доступны)
-        allowed_commands = ['/start', '/subscribe', '/support', '/documents', '/favorites', '/settings', '/admin', '/check_payment', '/check_payment_config']
+        allowed_commands = ['/start', '/subscribe', '/support', '/documents', '/favorites', '/settings', '/admin', '/stats', '/check_payment', '/check_payment_config']
         
         # Callback-запросы, которые должны работать без проверки доступа (всегда доступны)
         allowed_callbacks = [
