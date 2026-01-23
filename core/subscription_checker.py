@@ -209,6 +209,8 @@ class AccessCheckerMiddleware(BaseMiddleware):
         allowed_callbacks = [
             'start_trial',  # Активация пробного периода
             'activate_free_period',  # Активация бесплатного периода на 90 дней
+            'start_chat',  # Начать беседу из онбординга
+            'show_calendar',  # Показать календарь из онбординга
             'subscribe_premium',  # Кнопка оформления подписки
             'subscribe_1month', 'subscribe_3month', 'subscribe_12month',  # Выбор тарифа
             'open_docs',  # Открытие документов
