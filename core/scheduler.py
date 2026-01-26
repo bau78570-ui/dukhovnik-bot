@@ -90,10 +90,22 @@ def sanitize_plain_text(text: str) -> str:
     return re.sub(r'<[^>]+>', '', text).strip()
 
 def strip_section_label(text: str, label: str) -> str:
+    """
+    Удаляет метку секции (например, "Молитва:" или "Напутствие:") из начала текста.
+    Также удаляет дублирование метки в начале строк.
+    """
     if not text:
         return ""
+    # Удаляем метку из начала текста
     pattern = rf'^\s*{re.escape(label)}\s*[:\-]\s*'
-    return re.sub(pattern, '', text, flags=re.IGNORECASE).strip()
+    text = re.sub(pattern, '', text, flags=re.IGNORECASE).strip()
+    
+    # Удаляем повторяющиеся метки в начале строк (на случай дублирования от AI)
+    # Например: "Напутствие: Дорогой друг..." -> "Дорогой друг..."
+    pattern_line_start = rf'^{re.escape(label)}\s*[:\-]\s*'
+    text = re.sub(pattern_line_start, '', text, flags=re.IGNORECASE | re.MULTILINE).strip()
+    
+    return text
 
 def build_evening_prayer_by_index(index: int) -> str:
     parts = evening_prayer_parts
@@ -455,26 +467,16 @@ async def send_afternoon_notification(bot: Bot):
 
 async def send_evening_notification(bot: Bot):
     """
-    Отправляет вечернее уведомление с вечерней молитвой и вопросом для рефлексии.
-    Формат: "Добрый вечер! Вечерняя молитва: [молитва]. Что сегодня принесло радость?"
+    Отправляет вечернее уведомление с вечерней молитвой и предложением поговорить.
+    Формат: "Добрый вечер! Вечерняя молитва: [молитва]. Поговорим?"
     """
     logging.info("Начало отправки вечерних уведомлений")
-    
-    # Выбираем библейский текст
-    scripture = "Неизвестный стих"
-    source = "Неизвестный источник"
-    if daily_words:
-        selected_word = random.choice(daily_words)
-        scripture = selected_word.get("scripture", scripture)
-        source = selected_word.get("source", source)
 
     # Составляем молитву из частей (более 100 вариантов)
     day_index = datetime.now().timetuple().tm_yday
     evening_prayer = build_evening_prayer_by_index(day_index)
     
     # Формируем финальное сообщение (экранируем пользовательские данные)
-    scripture_escaped = escape(scripture) if scripture else ""
-    source_escaped = escape(source) if source else ""
     evening_prayer_escaped = escape(evening_prayer) if evening_prayer else ""
 
     reflection_prompt = "Поделитесь в чате тем, что сегодня особенно откликнулось в сердце."
@@ -485,9 +487,6 @@ async def send_evening_notification(bot: Bot):
 
     base_prefix = (
         "🌙 <b>Добрый вечер!</b>\n\n"
-        "📖 <b>Слово на вечер:</b>\n"
-        f"<i>{scripture_escaped}</i>\n"
-        f"<b>Источник:</b> {source_escaped}\n\n"
         "🙏 <b>Вечерняя молитва:</b>\n"
     )
     reflection_header = "\n\n💬 <b>Поговорим?</b>\n"
