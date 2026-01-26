@@ -91,19 +91,15 @@ def sanitize_plain_text(text: str) -> str:
 
 def strip_section_label(text: str, label: str) -> str:
     """
-    Удаляет метку секции (например, "Молитва:" или "Напутствие:") из начала текста.
-    Также удаляет дублирование метки в начале строк.
+    Удаляет метку секции (например, "Молитва:" или "Напутствие:") из начала текста
+    и из начала каждой строки (для обработки дублирования от AI).
     """
     if not text:
         return ""
-    # Удаляем метку из начала текста
+    # Удаляем метку с начала текста и с начала каждой внутренней строки (если есть дубликаты)
+    # Флаг MULTILINE делает ^ соответствующим началу каждой строки, а не только началу текста
     pattern = rf'^\s*{re.escape(label)}\s*[:\-]\s*'
-    text = re.sub(pattern, '', text, flags=re.IGNORECASE).strip()
-    
-    # Удаляем повторяющиеся метки в начале строк (на случай дублирования от AI)
-    # Например: "Напутствие: Дорогой друг..." -> "Дорогой друг..."
-    pattern_line_start = rf'^\s*{re.escape(label)}\s*[:\-]\s*'
-    text = re.sub(pattern_line_start, '', text, flags=re.IGNORECASE | re.MULTILINE).strip()
+    text = re.sub(pattern, '', text, flags=re.IGNORECASE | re.MULTILINE).strip()
     
     return text
 
