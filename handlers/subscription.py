@@ -201,6 +201,8 @@ async def subscribe_handler(message: Message, bot: Bot, state: FSMContext):
                 logger.error(f"Поврежденная дата free_period_start для user_id={user_id}: {free_period_start}")
                 # Устанавливаем дату в прошлое, чтобы период считался истекшим
                 free_period_start = datetime.now() - timedelta(days=FREE_PERIOD_DAYS + 1)
+                # Исправляем данные в user_data перед сохранением
+                user_data['free_period_start'] = free_period_start
                 # Сбрасываем статус
                 user_data['status'] = 'free_limit'
                 save_user_db()
