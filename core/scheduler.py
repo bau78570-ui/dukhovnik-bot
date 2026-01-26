@@ -642,7 +642,7 @@ async def send_free_period_ending_notification(bot: Bot):
     """
     logging.info("Начало проверки окончания бесплатных периодов")
     
-    FREE_PERIOD_DAYS = 90
+    FREE_PERIOD_DAYS = 30
     WARNING_DAYS_BEFORE = 7
     
     sent_count = 0

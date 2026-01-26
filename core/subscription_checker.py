@@ -13,12 +13,12 @@ load_dotenv()
 
 ADMIN_ID = os.getenv("ADMIN_ID", "")
 TRIAL_DURATION_DAYS = 3
-FREE_PERIOD_DAYS = 90
+FREE_PERIOD_DAYS = 30
 
 # --- Функции проверки статусов ---
 async def is_free_period_active(user_id: int) -> bool:
     """
-    Проверяет активность бесплатного периода на 90 дней.
+    Проверяет активность бесплатного периода на 30 дней (1 месяц).
     Возвращает True, если бесплатный период активен, False в противном случае.
     """
     user_data = get_user(user_id)
@@ -208,7 +208,7 @@ class AccessCheckerMiddleware(BaseMiddleware):
         # Callback-запросы, которые должны работать без проверки доступа (всегда доступны)
         allowed_callbacks = [
             'start_trial',  # Активация пробного периода
-            'activate_free_period',  # Активация бесплатного периода на 90 дней
+            'activate_free_period',  # Активация бесплатного периода на 30 дней
             'start_chat',  # Начать беседу из онбординга
             'show_calendar',  # Показать календарь из онбординга
             'subscribe_premium',  # Кнопка оформления подписки
@@ -305,7 +305,7 @@ class AccessCheckerMiddleware(BaseMiddleware):
         else:
             print("INFO: Subscription is not active. Proceeding to next checks.")
         
-        # Шаг 4: Проверка на бесплатный период (90 дней)
+        # Шаг 4: Проверка на бесплатный период (30 дней)
         is_free_period = await is_free_period_active(user_id)
         print(f"INFO: Checking free period status... Result: {is_free_period}")
         if is_free_period:
