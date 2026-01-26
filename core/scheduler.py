@@ -102,7 +102,7 @@ def strip_section_label(text: str, label: str) -> str:
     
     # Удаляем повторяющиеся метки в начале строк (на случай дублирования от AI)
     # Например: "Напутствие: Дорогой друг..." -> "Дорогой друг..."
-    pattern_line_start = rf'^{re.escape(label)}\s*[:\-]\s*'
+    pattern_line_start = rf'^\s*{re.escape(label)}\s*[:\-]\s*'
     text = re.sub(pattern_line_start, '', text, flags=re.IGNORECASE | re.MULTILINE).strip()
     
     return text
