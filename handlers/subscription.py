@@ -197,7 +197,13 @@ async def subscribe_handler(message: Message, bot: Bot, state: FSMContext):
             try:
                 free_period_start = datetime.fromisoformat(free_period_start)
             except (ValueError, TypeError):
-                free_period_start = datetime.now()
+                # Данные повреждены - логируем и считаем период истекшим
+                logger.error(f"Поврежденная дата free_period_start для user_id={user_id}: {free_period_start}")
+                # Устанавливаем дату в прошлое, чтобы период считался истекшим
+                free_period_start = datetime.now() - timedelta(days=FREE_PERIOD_DAYS + 1)
+                # Сбрасываем статус
+                user_data['status'] = 'free_limit'
+                save_user_db()
         
         free_period_end = free_period_start + timedelta(days=FREE_PERIOD_DAYS)
         days_left = (free_period_end - datetime.now()).days
