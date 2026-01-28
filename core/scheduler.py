@@ -17,6 +17,7 @@ from aiogram.types import FSInputFile # Добавляем импорт FSInputF
 from aiogram.enums import ParseMode
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from html import escape
+from utils.html_parser import convert_markdown_to_html
 
 from core.content_library import (
     daily_quotes,
@@ -426,9 +427,10 @@ async def send_afternoon_notification(bot: Bot):
     )
     hashtags = "#Православие #СловоДня"
     available_len = MAX_PHOTO_CAPTION_LEN - len(base_caption) - len("\n\n") - len(hashtags)
-    ai_reflection_escaped = escape(ai_reflection) if ai_reflection else ""
-    if ai_reflection_escaped:
-        ai_reflection_html = trim_to_sentence(ai_reflection_escaped, max(0, available_len), int(available_len * 0.7))
+    # Конвертируем Markdown в HTML для корректного форматирования (жирный, курсив и т.д.)
+    ai_reflection_html_converted = convert_markdown_to_html(ai_reflection) if ai_reflection else ""
+    if ai_reflection_html_converted:
+        ai_reflection_html = trim_to_sentence(ai_reflection_html_converted, max(0, available_len), int(available_len * 0.7))
     else:
         ai_reflection_html = ""
     caption = (
