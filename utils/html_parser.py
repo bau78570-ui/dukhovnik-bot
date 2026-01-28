@@ -2,7 +2,7 @@ import re
 import aiohttp
 from bs4 import BeautifulSoup
 
-def convert_markdown_to_html(text: str) -> str:
+def convert_markdown_to_html(text: str, preserve_html_tags: bool = True) -> str:
     """
     Преобразует базовый Markdown-текст в HTML.
     Поддерживает:
@@ -11,32 +11,39 @@ def convert_markdown_to_html(text: str) -> str:
     - Переносы строк: \n (обрабатываются Telegram API в режиме HTML)
     
     Также экранирует HTML-символы в тексте для безопасной отправки в Telegram.
+    
+    :param text: Текст для конвертации
+    :param preserve_html_tags: Если True, сохраняет существующие HTML-теги (для доверенного контента).
+                               Если False, экранирует ВСЕ HTML-теги (для недоверенного контента, например от AI).
     """
     if not text:
         return text
     
-    # Защищаем уже существующие HTML-теги от обработки
-    html_tag_placeholder_prefix = "___HTML_TAG_"
-    html_tag_placeholder_suffix = "___"
     html_tags = []
-    tag_pattern = r'<[^>]+>'
     
-    def save_tag(match):
-        tag = match.group(0)
-        html_tags.append(tag)
-        return f"{html_tag_placeholder_prefix}{len(html_tags) - 1}{html_tag_placeholder_suffix}"
+    # Защищаем уже существующие HTML-теги от обработки (только если preserve_html_tags=True)
+    if preserve_html_tags:
+        html_tag_placeholder_prefix = "___HTML_TAG_"
+        html_tag_placeholder_suffix = "___"
+        tag_pattern = r'<[^>]+>'
+        
+        def save_tag(match):
+            tag = match.group(0)
+            html_tags.append(tag)
+            return f"{html_tag_placeholder_prefix}{len(html_tags) - 1}{html_tag_placeholder_suffix}"
+        
+        # Сохраняем существующие HTML-теги
+        text = re.sub(tag_pattern, save_tag, text)
     
-    # Сохраняем существующие HTML-теги
-    text = re.sub(tag_pattern, save_tag, text)
-    
-    # Экранируем специальные символы HTML (но не в тегах, которые мы уже сохранили)
+    # Экранируем специальные символы HTML
     text = text.replace('&', '&amp;')
     text = text.replace('<', '&lt;')
     text = text.replace('>', '&gt;')
     
-    # Восстанавливаем сохраненные HTML-теги
-    for i, tag in enumerate(html_tags):
-        text = text.replace(f"{html_tag_placeholder_prefix}{i}{html_tag_placeholder_suffix}", tag)
+    # Восстанавливаем сохраненные HTML-теги (только если preserve_html_tags=True)
+    if preserve_html_tags:
+        for i, tag in enumerate(html_tags):
+            text = text.replace(f"{html_tag_placeholder_prefix}{i}{html_tag_placeholder_suffix}", tag)
     
     # Теперь обрабатываем markdown форматирование
     # Жирный текст: **текст** -> <b>текст</b>

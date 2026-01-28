@@ -428,7 +428,8 @@ async def send_afternoon_notification(bot: Bot):
     hashtags = "#Православие #СловоДня"
     available_len = MAX_PHOTO_CAPTION_LEN - len(base_caption) - len("\n\n") - len(hashtags)
     # Конвертируем Markdown в HTML для корректного форматирования (жирный, курсив и т.д.)
-    ai_reflection_html_converted = convert_markdown_to_html(ai_reflection) if ai_reflection else ""
+    # preserve_html_tags=False для безопасности: AI-контент не должен содержать готовые HTML-теги
+    ai_reflection_html_converted = convert_markdown_to_html(ai_reflection, preserve_html_tags=False) if ai_reflection else ""
     if ai_reflection_html_converted:
         ai_reflection_html = trim_to_sentence(ai_reflection_html_converted, max(0, available_len), int(available_len * 0.7))
     else:
