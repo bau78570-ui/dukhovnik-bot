@@ -81,8 +81,17 @@ def save_conversation_history(user_id: int, user_message: str, ai_response: str)
         save_user_db()
         return
     
-    if ai_response.startswith("Ошибка") or ai_response.startswith("Произошла ошибка"):
-        logging.warning(f"НЕ сохраняем ошибку AI в историю для user_id={user_id}: {ai_response[:50]}...")
+    # Проверяем на ТЕХНИЧЕСКИЕ ошибки (не блокируем духовные ответы об ошибках)
+    # Технические ошибки имеют специфичные паттерны из core/ai_interaction.py
+    is_technical_error = (
+        ai_response.startswith("Ошибка:") or  # "Ошибка: API ключ не настроен"
+        ai_response.startswith("Ошибка сети") or  # "Ошибка сети при обращении к AI"
+        "при обращении к AI" in ai_response or  # "Произошла ошибка при обращении к AI"
+        ai_response.startswith("API недоступен")  # Другие технические ошибки
+    )
+    
+    if is_technical_error:
+        logging.warning(f"НЕ сохраняем техническую ошибку AI в историю для user_id={user_id}: {ai_response[:50]}...")
         # Обновляем время последнего сообщения, но НЕ добавляем в историю
         user_data['last_message_time'] = datetime.now()
         save_user_db()
