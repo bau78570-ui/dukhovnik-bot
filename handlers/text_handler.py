@@ -73,8 +73,15 @@ def save_conversation_history(user_id: int, user_message: str, ai_response: str)
         except Exception as e:
             logging.error(f"Ошибка при проверке таймаута истории при сохранении для user_id={user_id}: {e}")
     
-    # Проверяем, не является ли ответ AI ошибкой (не сохраняем ошибки в историю)
-    if ai_response and (ai_response.startswith("Ошибка") or ai_response.startswith("Произошла ошибка")):
+    # Проверяем, не является ли ответ AI ошибкой или пустым (не сохраняем в историю)
+    if not ai_response or not ai_response.strip():
+        logging.warning(f"НЕ сохраняем пустой ответ AI в историю для user_id={user_id}")
+        # Обновляем время последнего сообщения, но НЕ добавляем в историю
+        user_data['last_message_time'] = datetime.now()
+        save_user_db()
+        return
+    
+    if ai_response.startswith("Ошибка") or ai_response.startswith("Произошла ошибка"):
         logging.warning(f"НЕ сохраняем ошибку AI в историю для user_id={user_id}: {ai_response[:50]}...")
         # Обновляем время последнего сообщения, но НЕ добавляем в историю
         user_data['last_message_time'] = datetime.now()

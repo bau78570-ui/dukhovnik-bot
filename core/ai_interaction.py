@@ -96,7 +96,19 @@ async def get_ai_response(user_message: str, conversation_history: list = None, 
     # Формируем системный промпт с именем пользователя (если есть)
     system_prompt = SYSTEM_PROMPT
     if user_name:
-        system_prompt += f"\n\n[USER INFO]\nИмя пользователя: {user_name}. Используй имя естественно и к месту, не в каждом сообщении."
+        # Санитизируем имя пользователя для предотвращения prompt injection
+        sanitized_name = user_name.strip()
+        # Удаляем переводы строк и управляющие символы
+        sanitized_name = sanitized_name.replace('\n', ' ').replace('\r', ' ')
+        # Удаляем квадратные скобки (используются для маркировки секций промпта)
+        sanitized_name = sanitized_name.replace('[', '').replace(']', '')
+        # Ограничиваем длину (максимум 50 символов)
+        sanitized_name = sanitized_name[:50]
+        # Удаляем множественные пробелы
+        sanitized_name = ' '.join(sanitized_name.split())
+        
+        if sanitized_name:  # Проверяем, что после санитизации осталось непустое имя
+            system_prompt += f"\n\n[USER INFO]\nИмя пользователя: {sanitized_name}. Используй имя естественно и к месту, не в каждом сообщении."
     
     # Формируем список сообщений с историей диалога
     messages = [{"role": "system", "content": system_prompt}]
