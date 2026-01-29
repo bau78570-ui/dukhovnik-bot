@@ -84,10 +84,10 @@ def save_conversation_history(user_id: int, user_message: str, ai_response: str)
     # Проверяем на ТЕХНИЧЕСКИЕ ошибки (не блокируем духовные ответы об ошибках)
     # Технические ошибки имеют специфичные паттерны из core/ai_interaction.py
     is_technical_error = (
-        ai_response.startswith("Ошибка:") or  # "Ошибка: API ключ не настроен"
+        ai_response.startswith("Ошибка:") or  # "Ошибка: API-ключ для DeepSeek не найден"
+        ai_response.startswith("Ошибка API:") or  # "Ошибка API: 500 - Internal Server Error"
         ai_response.startswith("Ошибка сети") or  # "Ошибка сети при обращении к AI"
-        "при обращении к AI" in ai_response or  # "Произошла ошибка при обращении к AI"
-        ai_response.startswith("API недоступен")  # Другие технические ошибки
+        "при обращении к AI" in ai_response  # "Произошла ошибка при обращении к AI"
     )
     
     if is_technical_error:
