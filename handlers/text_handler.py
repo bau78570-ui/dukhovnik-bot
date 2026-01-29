@@ -52,9 +52,34 @@ def get_conversation_history(user_id: int) -> list:
 def save_conversation_history(user_id: int, user_message: str, ai_response: str):
     """
     Сохраняет новое сообщение пользователя и ответ AI в историю диалога.
+    Проверяет таймаут и очищает устаревшую историю перед сохранением.
+    НЕ сохраняет ошибки AI в историю.
     """
     user_data = get_user(user_id)
     history = user_data.get('conversation_history', [])
+    last_message_time = user_data.get('last_message_time')
+    
+    # Проверяем таймаут - если последнее сообщение было давно, очищаем историю перед сохранением
+    if last_message_time:
+        try:
+            if isinstance(last_message_time, str):
+                last_time = datetime.fromisoformat(last_message_time)
+            else:
+                last_time = last_message_time
+            
+            if datetime.now() - last_time > timedelta(hours=CONVERSATION_TIMEOUT_HOURS):
+                logging.info(f"Очистка устаревшей истории при сохранении для user_id={user_id} (таймаут {CONVERSATION_TIMEOUT_HOURS}ч)")
+                history = []  # Очищаем историю перед добавлением нового сообщения
+        except Exception as e:
+            logging.error(f"Ошибка при проверке таймаута истории при сохранении для user_id={user_id}: {e}")
+    
+    # Проверяем, не является ли ответ AI ошибкой (не сохраняем ошибки в историю)
+    if ai_response and (ai_response.startswith("Ошибка") or ai_response.startswith("Произошла ошибка")):
+        logging.warning(f"НЕ сохраняем ошибку AI в историю для user_id={user_id}: {ai_response[:50]}...")
+        # Обновляем время последнего сообщения, но НЕ добавляем в историю
+        user_data['last_message_time'] = datetime.now()
+        save_user_db()
+        return
     
     # Добавляем новые сообщения
     history.append({"role": "user", "content": user_message})
