@@ -5,15 +5,82 @@ from core.ai_interaction import get_ai_response
 from states import PrayerState # Импортируем состояния
 from core.calendar_data import get_calendar_data
 import logging # Импортируем logging
-from datetime import datetime
+from datetime import datetime, timedelta
 import os # Импортируем os для работы с путями файлов
 import random # Импортируем random для выбора случайного изображения
 from core.content_sender import send_and_delete_previous # Импортируем новую централизованную функцию
 from utils.html_parser import convert_markdown_to_html # Импортируем convert_markdown_to_html
-from core.user_database import add_favorite_message, get_favorite_messages, remove_favorite_message # Импортируем функции для избранного
+from core.user_database import add_favorite_message, get_favorite_messages, remove_favorite_message, get_user, save_user_db # Импортируем функции для избранного и user_db
 
 # Создаем роутер для этого обработчика
 router = Router()
+
+# Константы для управления историей диалога
+MAX_CONVERSATION_HISTORY = 10  # Максимальное количество пар сообщений (user + assistant) в истории
+CONVERSATION_TIMEOUT_HOURS = 1  # Таймаут для очистки старой истории (в часах)
+
+def get_conversation_history(user_id: int) -> list:
+    """
+    Получает историю диалога пользователя, очищает устаревшую историю.
+    Возвращает список сообщений в формате [{«role»: «user»/«assistant», «content»: «...»}, ...]
+    """
+    user_data = get_user(user_id)
+    history = user_data.get('conversation_history', [])
+    last_message_time = user_data.get('last_message_time')
+    
+    # Проверяем таймаут - если последнее сообщение было давно, очищаем историю
+    if last_message_time:
+        try:
+            if isinstance(last_message_time, str):
+                last_time = datetime.fromisoformat(last_message_time)
+            else:
+                last_time = last_message_time
+            
+            if datetime.now() - last_time > timedelta(hours=CONVERSATION_TIMEOUT_HOURS):
+                logging.info(f"Очистка устаревшей истории диалога для user_id={user_id} (таймаут {CONVERSATION_TIMEOUT_HOURS}ч)")
+                return []  # Возвращаем пустую историю
+        except Exception as e:
+            logging.error(f"Ошибка при проверке таймаута истории для user_id={user_id}: {e}")
+    
+    # Ограничиваем количество сообщений в истории (берем последние N*2)
+    max_messages = MAX_CONVERSATION_HISTORY * 2  # *2 потому что каждая пара - это user + assistant
+    if len(history) > max_messages:
+        history = history[-max_messages:]
+    
+    return history
+
+def save_conversation_history(user_id: int, user_message: str, ai_response: str):
+    """
+    Сохраняет новое сообщение пользователя и ответ AI в историю диалога.
+    """
+    user_data = get_user(user_id)
+    history = user_data.get('conversation_history', [])
+    
+    # Добавляем новые сообщения
+    history.append({"role": "user", "content": user_message})
+    history.append({"role": "assistant", "content": ai_response})
+    
+    # Ограничиваем размер истории
+    max_messages = MAX_CONVERSATION_HISTORY * 2
+    if len(history) > max_messages:
+        history = history[-max_messages:]
+    
+    # Сохраняем обновленную историю и время последнего сообщения
+    user_data['conversation_history'] = history
+    user_data['last_message_time'] = datetime.now()
+    save_user_db()
+    
+    logging.info(f"Сохранена история диалога для user_id={user_id}, сообщений в истории: {len(history)}")
+
+def clear_conversation_history(user_id: int):
+    """
+    Очищает историю диалога пользователя (для команды /new_chat).
+    """
+    user_data = get_user(user_id)
+    user_data['conversation_history'] = []
+    user_data['last_message_time'] = None
+    save_user_db()
+    logging.info(f"Очищена история диалога для user_id={user_id}")
 
 # Функция для создания клавиатуры с кнопкой "В избранное"
 def get_favorite_keyboard(message_id: int, is_favorited: bool = False) -> InlineKeyboardMarkup:
@@ -133,9 +200,24 @@ async def handle_text_message(message: Message, bot: Bot, state: FSMContext):
     # Календарь запрашивается отдельной командой /calendar
 
     # Если не в режиме молитвы и не запрос календаря, работаем как обычно
-    ai_response = await get_ai_response(message.text)
-    # Преобразуем Markdown в HTML
-    ai_response = convert_markdown_to_html(ai_response)
+    # Получаем историю диалога для контекста
+    conversation_history = get_conversation_history(user_id)
+    
+    # Получаем имя пользователя для персонализации
+    user_name = message.from_user.first_name if message.from_user.first_name else None
+    
+    # Отправляем запрос к AI с контекстом истории и именем
+    ai_response = await get_ai_response(
+        message.text, 
+        conversation_history=conversation_history,
+        user_name=user_name
+    )
+    
+    # Сохраняем сообщение пользователя и ответ AI в историю
+    save_conversation_history(user_id, message.text, ai_response)
+    
+    # Преобразуем Markdown в HTML (без сохранения HTML-тегов для безопасности)
+    ai_response = convert_markdown_to_html(ai_response, preserve_html_tags=False)
     formatted_response = ai_response.replace('\n', '\n\n') # Возможно, это уже не нужно, если convert_markdown_to_html обрабатывает \n
     await send_and_delete_previous(
         bot=bot,

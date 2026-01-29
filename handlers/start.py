@@ -540,3 +540,25 @@ async def stats_handler(message: Message, bot: Bot):
     # Отправляем статистику
     await message.answer(stats_text, parse_mode='HTML')
     logging.info(f"Статистика отправлена админу {user_id}")
+
+@router.message(Command("new_chat"))
+async def new_chat_handler(message: Message):
+    """
+    Обработчик команды /new_chat для начала новой беседы (очистка истории диалога).
+    """
+    user_id = message.from_user.id
+    user_data = get_user(user_id)
+    
+    # Очищаем историю диалога
+    user_data['conversation_history'] = []
+    user_data['last_message_time'] = None
+    save_user_db()
+    
+    logging.info(f"Пользователь {user_id} начал новую беседу (очистил историю)")
+    
+    await message.answer(
+        "✨ <b>Начинаем новую беседу!</b>\n\n"
+        "История нашего диалога очищена. Теперь я буду отвечать без учета предыдущих сообщений.\n\n"
+        "Чем могу помочь? 🙏",
+        parse_mode='HTML'
+    )

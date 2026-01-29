@@ -48,6 +48,7 @@ async def set_main_menu(bot: Bot):
     main_menu_commands = [
         BotCommand(command="/start", description="🔄 Перезапустить бота"),
         BotCommand(command="/dukhovnik", description="💬 Поговорить с Духовником"),
+        BotCommand(command="/new_chat", description="✨ Начать новую беседу"),
         BotCommand(command="/calendar", description="🗓️ Православный календарь"),
         BotCommand(command="/molitva", description="🙏 Молитва"),
         # BotCommand(command="/daily_word", description="📖 Слово дня (Premium)"), # Скрыто - доступно только через уведомления
