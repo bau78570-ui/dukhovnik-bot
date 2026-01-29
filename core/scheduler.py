@@ -481,9 +481,50 @@ async def send_evening_notification(bot: Bot):
     """
     logging.info("Начало отправки вечерних уведомлений")
 
-    # Составляем молитву из частей (более 100 вариантов)
-    day_index = datetime.now().timetuple().tm_yday
-    evening_prayer = build_evening_prayer_by_index(day_index)
+    today = datetime.now()
+    day_index = today.timetuple().tm_yday
+    
+    # Получаем тему дня для контекста вечерней молитвы
+    azbyka_api_key = os.getenv("AZBYKA_API_KEY")
+    ical_url = os.getenv("ICAL_URL")
+    evening_theme = None
+    if azbyka_api_key:
+        evening_theme, _ = await get_calendar_theme_from_azbyka(azbyka_api_key)
+    if not evening_theme and ical_url:
+        evening_theme = await get_calendar_theme_from_ical(ical_url)
+    
+    # Генерируем вечернюю молитву через AI (с fallback на комбинаторную)
+    evening_prayer = build_evening_prayer_by_index(day_index)  # Fallback молитва
+    
+    current_date_str = today.strftime("%d.%m.%Y")
+    evening_prompt = (
+        f"ВАЖНО: Сегодня {current_date_str}. Текущий год: {today.year}.\n\n"
+        "Составь вечернюю молитву для православного бота.\n"
+        "Молитва должна быть глубокой, умиротворяющей, в каноническом православном стиле.\n"
+        "Структура: благодарность за прожитый день, покаяние, просьба о мирном сне и благословении на грядущий день.\n"
+        f"{'Учитывай тему/событие дня: ' + evening_theme + '.' if evening_theme else ''}\n"
+        "Требования:\n"
+        "- Объем 200-300 символов (короткая, но ёмкая молитва)\n"
+        "- Язык: современный церковнославянский стиль, понятный и тёплый\n"
+        "- БЕЗ эмодзи, БЕЗ заголовков типа 'Молитва:', только текст молитвы\n"
+        "- Уникальная для каждого дня, отражающая вечерний покой и упование на Бога\n"
+        "- Если тема дня относится к будущему событию - НЕ говори о нем как о прошедшем"
+    )
+    
+    try:
+        ai_evening = await get_ai_response(evening_prompt)
+        if ai_evening and not is_ai_error(ai_evening):
+            # Убираем возможные метки "Молитва:" если AI их добавил
+            ai_evening_clean = strip_section_label(sanitize_plain_text(ai_evening), "молитва")
+            if ai_evening_clean and len(ai_evening_clean) > 50:  # Проверяем, что получили нормальный ответ
+                evening_prayer = ai_evening_clean
+                logging.info("Получена AI-молитва для вечернего уведомления")
+            else:
+                logging.warning("AI-ответ для вечерней молитвы слишком короткий, используем fallback")
+        else:
+            logging.warning("AI не сгенерировал вечернюю молитву, используем fallback")
+    except Exception as e:
+        logging.error(f"Ошибка при генерации вечерней молитвы через AI: {e}. Используем fallback.")
     
     # Формируем финальное сообщение (экранируем пользовательские данные)
     evening_prayer_escaped = escape(evening_prayer) if evening_prayer else ""
