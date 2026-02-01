@@ -70,11 +70,12 @@ async def fetch_html_content(url: str) -> str | None:
             async with session.get(url) as response:
                 response.raise_for_status()  # Вызывает исключение для кодов состояния HTTP ошибок
                 return await response.text()
+        except (asyncio.TimeoutError, aiohttp.ServerTimeoutError) as e:
+            # ВАЖНО: Ловим таймауты ПЕРВЫМИ (до общего ClientError)
+            print(f"Таймаут при получении HTML с {url}: {e}")
+            return None
         except aiohttp.ClientError as e:
             print(f"Ошибка при получении HTML с {url}: {e}")
-            return None
-        except asyncio.TimeoutError:
-            print(f"Таймаут при получении HTML с {url}")
             return None
         except Exception as e:
             print(f"Неизвестная ошибка при получении HTML с {url}: {e}")
