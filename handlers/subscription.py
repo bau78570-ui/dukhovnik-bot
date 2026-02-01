@@ -39,7 +39,14 @@ provider_token = PROVIDER_TOKEN_TEST if TELEGRAM_PAYMENTS_TEST else PROVIDER_TOK
 logger = logging.getLogger(__name__)
 payment_logger = logging.getLogger("payments")
 if not payment_logger.handlers:
-    payment_handler = logging.FileHandler("payments.log", encoding="utf-8")
+    from logging.handlers import RotatingFileHandler
+    # Ротация для payments.log (макс 5 МБ, 3 резервные копии)
+    payment_handler = RotatingFileHandler(
+        "payments.log",
+        maxBytes=5*1024*1024,  # 5 МБ
+        backupCount=3,
+        encoding="utf-8"
+    )
     payment_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
     payment_logger.addHandler(payment_handler)
 payment_logger.setLevel(logging.INFO)

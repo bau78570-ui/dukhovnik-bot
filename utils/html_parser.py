@@ -1,4 +1,5 @@
 import re
+import asyncio
 import aiohttp
 from bs4 import BeautifulSoup
 
@@ -61,15 +62,19 @@ def convert_markdown_to_html(text: str, preserve_html_tags: bool = True) -> str:
 
 async def fetch_html_content(url: str) -> str | None:
     """
-    Асинхронно извлекает HTML-содержимое с указанного URL.
+    Асинхронно извлекает HTML-содержимое с указанного URL с таймаутом 30 секунд.
     """
-    async with aiohttp.ClientSession() as session:
+    timeout = aiohttp.ClientTimeout(total=30)  # Таймаут 30 секунд
+    async with aiohttp.ClientSession(timeout=timeout) as session:
         try:
             async with session.get(url) as response:
                 response.raise_for_status()  # Вызывает исключение для кодов состояния HTTP ошибок
                 return await response.text()
         except aiohttp.ClientError as e:
             print(f"Ошибка при получении HTML с {url}: {e}")
+            return None
+        except asyncio.TimeoutError:
+            print(f"Таймаут при получении HTML с {url}")
             return None
         except Exception as e:
             print(f"Неизвестная ошибка при получении HTML с {url}: {e}")

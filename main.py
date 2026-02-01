@@ -21,12 +21,22 @@ from core.subscription_checker import check_access # Импортируем ми
 from core.user_database import user_db, get_user # Импортируем user_db и get_user
 # from core.calendar_data import cached_calendar_data # Импортируем кэш календаря
 
-# Настройка логирования
+# Настройка логирования с ротацией файлов
+from logging.handlers import RotatingFileHandler
+
+# Создаем handler с ротацией (максимум 10 МБ, 5 резервных копий)
+rotating_handler = RotatingFileHandler(
+    'bot.log',
+    maxBytes=10*1024*1024,  # 10 МБ
+    backupCount=5,
+    encoding='utf-8'
+)
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('bot.log', encoding='utf-8'),
+        rotating_handler,
         logging.StreamHandler()  # Также выводим в консоль
     ]
 )
