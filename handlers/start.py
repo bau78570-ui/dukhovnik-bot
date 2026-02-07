@@ -164,9 +164,9 @@ async def command_start_handler(message: Message, bot: Bot, state: FSMContext) -
     # Трекинг события запуска бота в Яндекс.Метрике
     asyncio.create_task(track_bot_start(user_id, is_new_user=is_new_user))
     
-    # Если новый пользователь - трекаем регистрацию
-    if is_new_user and start_params:
-        utm_source = start_params.get('utm_source', 'direct')
+    # Если новый пользователь - трекаем регистрацию (независимо от наличия UTM)
+    if is_new_user:
+        utm_source = start_params.get('utm_source', 'direct') if start_params else 'organic'
         asyncio.create_task(track_new_user(user_id, utm_source=utm_source))
     
     # Сначала убираем старую клавиатуру (сброс кэша Telegram)

@@ -74,11 +74,15 @@ async def send_metrika_event(
                     logger.warning(f"Яндекс.Метрика: ошибка {response.status} при отправке события '{event_name}'")
                     return False
                     
-    except asyncio.TimeoutError:
-        logger.warning(f"Яндекс.Метрика: таймаут при отправке события '{event_name}' для user_id={user_id}")
+    except (asyncio.TimeoutError, aiohttp.ServerTimeoutError, aiohttp.ClientConnectionError) as e:
+        # ВАЖНО: Ловим таймауты ПЕРВЫМИ (до общего Exception)
+        logger.warning(f"Яндекс.Метрика: таймаут при отправке события '{event_name}' для user_id={user_id}: {e}")
+        return False
+    except aiohttp.ClientError as e:
+        logger.warning(f"Яндекс.Метрика: сетевая ошибка при отправке события '{event_name}': {e}")
         return False
     except Exception as e:
-        logger.error(f"Яндекс.Метрика: ошибка при отправке события '{event_name}': {e}")
+        logger.error(f"Яндекс.Метрика: неизвестная ошибка при отправке события '{event_name}': {e}")
         return False
 
 

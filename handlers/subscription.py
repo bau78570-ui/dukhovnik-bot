@@ -726,15 +726,19 @@ async def successful_payment_handler(message: Message, bot: Bot):
             if 'payments' not in user_data:
                 user_data['payments'] = []
             
-            # Формируем текст периода для истории
+            # Формируем текст периода для истории и тип подписки для аналитики
             if days == 30:
                 period_text = "1 месяц"
+                subscription_type = "premium_30_days"
             elif days == 90:
                 period_text = "3 месяца"
+                subscription_type = "premium_90_days"
             elif days == 365:
                 period_text = "1 год"
+                subscription_type = "premium_365_days"
             else:
                 period_text = f"{days} дней"
+                subscription_type = f"premium_{days}_days"
             
             payment_record = {
                 'date': datetime.now().strftime('%d.%m.%Y %H:%M'),
@@ -747,7 +751,7 @@ async def successful_payment_handler(message: Message, bot: Bot):
             
             # Трекинг успешного платежа в Яндекс.Метрике
             asyncio.create_task(track_payment_success(user_id, payment_info.total_amount, days))
-            asyncio.create_task(track_subscription_activated(user_id, period_text, payment_info.total_amount))
+            asyncio.create_task(track_subscription_activated(user_id, subscription_type, payment_info.total_amount))
             
             logger.info(f"Premium подписка успешно активирована для user_id={user_id} на {days} дней. Платеж сохранен в историю.")
             payment_logger.info(f"ACTIVATED user_id={user_id} days={days} end_date={user_data.get('subscription_end_date')}")
