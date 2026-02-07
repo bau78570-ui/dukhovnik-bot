@@ -110,14 +110,24 @@ async def command_start_handler(message: Message, bot: Bot, state: FSMContext) -
     # Парсим UTM параметры и реферальные ссылки
     start_params = parse_start_params(message.text)
     
-    # Сохраняем UTM параметры только для новых пользователей
-    if is_new_user and start_params:
-        utm_source = start_params.get('utm_source', 'direct')
-        utm_medium = start_params.get('utm_medium', '')
-        utm_campaign = start_params.get('utm_campaign', '')
-        utm_term = start_params.get('utm_term', '')
-        utm_content = start_params.get('utm_content', '')
-        referrer_id = start_params.get('ref', '')
+    # Сохраняем UTM параметры для новых пользователей
+    if is_new_user:
+        # Если параметров нет - устанавливаем utm_source='organic'
+        if start_params:
+            utm_source = start_params.get('utm_source', 'direct')
+            utm_medium = start_params.get('utm_medium', '')
+            utm_campaign = start_params.get('utm_campaign', '')
+            utm_term = start_params.get('utm_term', '')
+            utm_content = start_params.get('utm_content', '')
+            referrer_id = start_params.get('ref', '')
+        else:
+            # Новый пользователь без параметров = органический трафик
+            utm_source = 'organic'
+            utm_medium = ''
+            utm_campaign = ''
+            utm_term = ''
+            utm_content = ''
+            referrer_id = ''
         
         # Сохраняем UTM данные
         user_data['utm_source'] = utm_source
@@ -164,10 +174,10 @@ async def command_start_handler(message: Message, bot: Bot, state: FSMContext) -
     # Трекинг события запуска бота в Яндекс.Метрике
     asyncio.create_task(track_bot_start(user_id, is_new_user=is_new_user))
     
-    # Если новый пользователь - трекаем регистрацию (независимо от наличия UTM)
+    # Если новый пользователь - трекаем регистрацию
     if is_new_user:
-        utm_source = start_params.get('utm_source', 'direct') if start_params else 'organic'
-        asyncio.create_task(track_new_user(user_id, utm_source=utm_source))
+        # utm_source уже сохранен в user_data на строках выше
+        asyncio.create_task(track_new_user(user_id, utm_source=user_data.get('utm_source', 'organic')))
     
     # Сначала убираем старую клавиатуру (сброс кэша Telegram)
     await message.answer("♻️", reply_markup=ReplyKeyboardRemove())
