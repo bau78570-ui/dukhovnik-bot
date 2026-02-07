@@ -1,5 +1,6 @@
 import os
 import logging
+import asyncio
 from datetime import datetime, timedelta
 from aiogram import Router, Bot, F
 from aiogram.filters import Command
@@ -8,6 +9,7 @@ from aiogram.fsm.context import FSMContext
 from dotenv import load_dotenv
 from core.user_database import user_db, get_user, save_user_db
 from core.subscription_checker import activate_premium_subscription, activate_trial
+from core.yandex_metrika import track_subscription_activated, track_payment_success, track_free_period_activated, track_trial_activated
 
 load_dotenv()
 
@@ -286,6 +288,9 @@ async def activate_free_period_handler(callback_query: CallbackQuery, bot: Bot):
     user_data['free_period_start'] = datetime.now()
     user_data['status'] = 'free_active'
     save_user_db()
+    
+    # Трекинг активации бесплатного периода в Яндекс.Метрике
+    asyncio.create_task(track_free_period_activated(user_id))
     
     free_period_end = datetime.now() + timedelta(days=FREE_PERIOD_DAYS)
     
@@ -739,6 +744,10 @@ async def successful_payment_handler(message: Message, bot: Bot):
             }
             user_data['payments'].append(payment_record)
             save_user_db()  # Сохраняем изменения
+            
+            # Трекинг успешного платежа в Яндекс.Метрике
+            asyncio.create_task(track_payment_success(user_id, payment_info.total_amount, days))
+            asyncio.create_task(track_subscription_activated(user_id, period_text, payment_info.total_amount))
             
             logger.info(f"Premium подписка успешно активирована для user_id={user_id} на {days} дней. Платеж сохранен в историю.")
             payment_logger.info(f"ACTIVATED user_id={user_id} days={days} end_date={user_data.get('subscription_end_date')}")

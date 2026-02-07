@@ -2,6 +2,7 @@ import locale
 import os
 import re # Добавляем импорт re для регулярных выражений
 import logging
+import asyncio
 from datetime import datetime, timedelta
 from aiogram import Router, Bot
 from aiogram.filters import Command
@@ -13,6 +14,7 @@ from core.content_sender import send_and_delete_previous, send_content_message #
 from core.calendar_data import get_calendar_data, fetch_and_cache_calendar_data
 from core.user_database import get_user # Импортируем get_user
 from core.subscription_checker import activate_trial # Импортируем activate_trial
+from core.yandex_metrika import track_feature_used # Импортируем Яндекс.Метрику
 
 # Устанавливаем русскую локаль для корректного отображения месяца
 try:
@@ -30,6 +32,11 @@ async def calendar_handler(message: Message, bot: Bot, state: FSMContext):
     Получает данные о текущем дне с pravoslavie.ru и azbyka.ru и отправляет пользователю.
     """
     chat_id = message.chat.id
+    user_id = message.from_user.id
+    
+    # Трекинг использования календаря в Яндекс.Метрике
+    asyncio.create_task(track_feature_used(user_id, 'calendar'))
+    
     await bot.send_chat_action(chat_id, ChatAction.UPLOAD_PHOTO)
 
     try:
@@ -146,6 +153,11 @@ async def molitva_handler(message: Message, bot: Bot, state: FSMContext):
     Обработчик для команды /molitva.
     Предлагает пользователю составить молитву.
     """
+    user_id = message.from_user.id
+    
+    # Трекинг использования функции молитвы в Яндекс.Метрике
+    asyncio.create_task(track_feature_used(user_id, 'molitva'))
+    
     text = (
         "🙏 <b>Молитва</b>\n\n"
         "Молитва — это искренний разговор с Богом. "

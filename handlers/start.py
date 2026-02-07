@@ -7,6 +7,7 @@ from datetime import datetime # Импортируем datetime
 from core.content_sender import send_and_delete_previous, send_content_message # Импортируем новую централизованную функцию
 from core.user_database import get_user, user_db, save_user_db # Импортируем get_user, user_db и save_user_db
 from core.subscription_checker import is_premium # Импортируем is_premium
+from core.yandex_metrika import track_bot_start, track_new_user, track_feature_used # Импортируем Яндекс.Метрику
 import logging # Импортируем logging
 import asyncio # Импортируем asyncio для задержек
 import os # Импортируем os для ADMIN_ID
@@ -159,6 +160,14 @@ async def command_start_handler(message: Message, bot: Bot, state: FSMContext) -
         if username and not user_data.get('username'):
             user_data['username'] = username
         save_user_db()
+    
+    # Трекинг события запуска бота в Яндекс.Метрике
+    asyncio.create_task(track_bot_start(user_id, is_new_user=is_new_user))
+    
+    # Если новый пользователь - трекаем регистрацию
+    if is_new_user and start_params:
+        utm_source = start_params.get('utm_source', 'direct')
+        asyncio.create_task(track_new_user(user_id, utm_source=utm_source))
     
     # Сначала убираем старую клавиатуру (сброс кэша Telegram)
     await message.answer("♻️", reply_markup=ReplyKeyboardRemove())
