@@ -7,7 +7,7 @@ from datetime import datetime # Импортируем datetime
 from core.content_sender import send_and_delete_previous, send_content_message # Импортируем новую централизованную функцию
 from core.user_database import get_user, user_db, save_user_db # Импортируем get_user, user_db и save_user_db
 from core.subscription_checker import is_premium # Импортируем is_premium
-from core.yandex_metrika import track_bot_start, track_new_user, track_feature_used # Импортируем Яндекс.Метрику
+from core.yandex_metrika import track_bot_start, track_new_user, track_feature_used, send_offline_conversion_bot_start # Импортируем Яндекс.Метрику
 import logging # Импортируем logging
 import asyncio # Импортируем asyncio для задержек
 import os # Импортируем os для ADMIN_ID
@@ -174,10 +174,12 @@ async def command_start_handler(message: Message, bot: Bot, state: FSMContext) -
     # Трекинг события запуска бота в Яндекс.Метрике
     asyncio.create_task(track_bot_start(user_id, is_new_user=is_new_user))
     
-    # Если новый пользователь - трекаем регистрацию
+    # Если новый пользователь - трекаем регистрацию и отправляем оффлайн-конверсию
     if is_new_user:
         # utm_source уже сохранен в user_data на строках выше
         asyncio.create_task(track_new_user(user_id, utm_source=user_data.get('utm_source', 'organic')))
+        # Отправляем оффлайн-конверсию для цели "bot_start"
+        asyncio.create_task(send_offline_conversion_bot_start(user_id))
     
     # Сначала убираем старую клавиатуру (сброс кэша Telegram)
     await message.answer("♻️", reply_markup=ReplyKeyboardRemove())

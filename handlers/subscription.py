@@ -9,7 +9,7 @@ from aiogram.fsm.context import FSMContext
 from dotenv import load_dotenv
 from core.user_database import user_db, get_user, save_user_db
 from core.subscription_checker import activate_premium_subscription, activate_trial
-from core.yandex_metrika import track_subscription_activated, track_payment_success, track_free_period_activated, track_trial_activated
+from core.yandex_metrika import track_subscription_activated, track_payment_success, track_free_period_activated, track_trial_activated, send_offline_conversion_free_period, send_offline_conversion_payment
 
 load_dotenv()
 
@@ -291,6 +291,8 @@ async def activate_free_period_handler(callback_query: CallbackQuery, bot: Bot):
     
     # Трекинг активации бесплатного периода в Яндекс.Метрике
     asyncio.create_task(track_free_period_activated(user_id))
+    # Отправляем оффлайн-конверсию для цели "free_period_start"
+    asyncio.create_task(send_offline_conversion_free_period(user_id))
     
     free_period_end = datetime.now() + timedelta(days=FREE_PERIOD_DAYS)
     
@@ -752,6 +754,8 @@ async def successful_payment_handler(message: Message, bot: Bot):
             # Трекинг успешного платежа в Яндекс.Метрике
             asyncio.create_task(track_payment_success(user_id, payment_info.total_amount, days))
             asyncio.create_task(track_subscription_activated(user_id, subscription_type, payment_info.total_amount))
+            # Отправляем оффлайн-конверсию для цели "premium_payment"
+            asyncio.create_task(send_offline_conversion_payment(user_id, payment_info.total_amount))
             
             logger.info(f"Premium подписка успешно активирована для user_id={user_id} на {days} дней. Платеж сохранен в историю.")
             payment_logger.info(f"ACTIVATED user_id={user_id} days={days} end_date={user_data.get('subscription_end_date')}")
