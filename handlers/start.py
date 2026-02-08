@@ -120,6 +120,8 @@ async def command_start_handler(message: Message, bot: Bot, state: FSMContext) -
             utm_term = start_params.get('utm_term', '')
             utm_content = start_params.get('utm_content', '')
             referrer_id = start_params.get('ref', '')
+            # Извлекаем ClientID из UTM параметров (yclid или client_id)
+            metrika_client_id = start_params.get('yclid') or start_params.get('client_id', '')
         else:
             # Новый пользователь без параметров = органический трафик
             utm_source = 'organic'
@@ -128,13 +130,26 @@ async def command_start_handler(message: Message, bot: Bot, state: FSMContext) -
             utm_term = ''
             utm_content = ''
             referrer_id = ''
+            metrika_client_id = ''
         
-        # Сохраняем UTM данные
+        # Генерируем или используем существующий ClientID для Яндекс.Метрики
+        from core.yandex_metrika import generate_client_id
+        if metrika_client_id:
+            # Используем ClientID из UTM параметров (yclid от Яндекс.Метрики)
+            client_id = metrika_client_id
+            logging.info(f"ClientID получен из UTM параметров для user_id={user_id}: {client_id}")
+        else:
+            # Генерируем стабильный ClientID на основе Telegram user_id
+            client_id = generate_client_id(user_id)
+            logging.info(f"ClientID сгенерирован для user_id={user_id}: {client_id}")
+        
+        # Сохраняем UTM данные и ClientID
         user_data['utm_source'] = utm_source
         user_data['utm_medium'] = utm_medium
         user_data['utm_campaign'] = utm_campaign
         user_data['utm_term'] = utm_term
         user_data['utm_content'] = utm_content
+        user_data['client_id'] = client_id  # Сохраняем ClientID для оффлайн-конверсий
         user_data['first_visit_date'] = datetime.now()
         
         # Сохраняем username для контакта
@@ -162,13 +177,20 @@ async def command_start_handler(message: Message, bot: Bot, state: FSMContext) -
             utm_log += f", utm_medium={utm_medium}"
         if referrer_id:
             utm_log += f", ref={referrer_id}"
+        if metrika_client_id:
+            utm_log += f", yclid={metrika_client_id}"
         
-        logging.info(f"Новый пользователь {user_id} (@{username or 'no_username'}) из источника: {utm_log}")
+        logging.info(f"Новый пользователь {user_id} (@{username or 'no_username'}) из источника: {utm_log}, ClientID={client_id}")
     elif not is_new_user and not user_data.get('utm_source'):
         # Для старых пользователей без UTM данных ставим "organic"
         user_data['utm_source'] = 'organic'
         if username and not user_data.get('username'):
             user_data['username'] = username
+        # Генерируем ClientID для старых пользователей, если его нет
+        if not user_data.get('client_id'):
+            from core.yandex_metrika import generate_client_id
+            user_data['client_id'] = generate_client_id(user_id)
+            logging.info(f"ClientID сгенерирован для существующего user_id={user_id}: {user_data['client_id']}")
         save_user_db()
     
     # Трекинг события запуска бота в Яндекс.Метрике
@@ -178,8 +200,12 @@ async def command_start_handler(message: Message, bot: Bot, state: FSMContext) -
     if is_new_user:
         # utm_source уже сохранен в user_data на строках выше
         asyncio.create_task(track_new_user(user_id, utm_source=user_data.get('utm_source', 'organic')))
-        # Отправляем оффлайн-конверсию для цели "bot_start"
-        asyncio.create_task(send_offline_conversion_bot_start(user_id))
+        # Отправляем оффлайн-конверсию для цели "bot_start" с ClientID
+        client_id = user_data.get('client_id')
+        if client_id:
+            asyncio.create_task(send_offline_conversion_bot_start(client_id, user_id))
+        else:
+            logging.warning(f"ClientID не найден для user_id={user_id}, оффлайн-конверсия bot_start не отправлена")
     
     # Сначала убираем старую клавиатуру (сброс кэша Telegram)
     await message.answer("♻️", reply_markup=ReplyKeyboardRemove())

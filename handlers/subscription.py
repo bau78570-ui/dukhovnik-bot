@@ -291,8 +291,13 @@ async def activate_free_period_handler(callback_query: CallbackQuery, bot: Bot):
     
     # Трекинг активации бесплатного периода в Яндекс.Метрике
     asyncio.create_task(track_free_period_activated(user_id))
-    # Отправляем оффлайн-конверсию для цели "free_period_start"
-    asyncio.create_task(send_offline_conversion_free_period(user_id))
+    # Отправляем оффлайн-конверсию для цели "free_period_start" с ClientID
+    client_id = user_data.get('client_id')
+    if client_id:
+        asyncio.create_task(send_offline_conversion_free_period(client_id, user_id))
+        logging.info(f"Оффлайн-конверсия free_period_start запланирована для user_id={user_id}, ClientID={client_id}")
+    else:
+        logging.warning(f"ClientID не найден для user_id={user_id}, оффлайн-конверсия free_period_start не отправлена")
     
     free_period_end = datetime.now() + timedelta(days=FREE_PERIOD_DAYS)
     
@@ -754,8 +759,13 @@ async def successful_payment_handler(message: Message, bot: Bot):
             # Трекинг успешного платежа в Яндекс.Метрике
             asyncio.create_task(track_payment_success(user_id, payment_info.total_amount, days))
             asyncio.create_task(track_subscription_activated(user_id, subscription_type, payment_info.total_amount))
-            # Отправляем оффлайн-конверсию для цели "premium_payment"
-            asyncio.create_task(send_offline_conversion_payment(user_id, payment_info.total_amount))
+            # Отправляем оффлайн-конверсию для цели "premium_payment" с ClientID
+            client_id = user_data.get('client_id')
+            if client_id:
+                asyncio.create_task(send_offline_conversion_payment(client_id, user_id, payment_info.total_amount))
+                logging.info(f"Оффлайн-конверсия premium_payment запланирована для user_id={user_id}, ClientID={client_id}, amount={payment_info.total_amount / 100} RUB")
+            else:
+                logging.warning(f"ClientID не найден для user_id={user_id}, оффлайн-конверсия premium_payment не отправлена")
             
             logger.info(f"Premium подписка успешно активирована для user_id={user_id} на {days} дней. Платеж сохранен в историю.")
             payment_logger.info(f"ACTIVATED user_id={user_id} days={days} end_date={user_data.get('subscription_end_date')}")

@@ -161,27 +161,31 @@ async def track_trial_activated(user_id: int):
 # ===== OFFLINE CONVERSIONS API =====
 
 async def send_offline_conversion(
-    user_id: int,
+    client_id: str,
     goal_id: str,
     price: float = 0.0,
-    currency: str = "RUB"
+    currency: str = "RUB",
+    user_id: Optional[int] = None
 ) -> bool:
     """
     Отправляет оффлайн-конверсию в Яндекс.Метрику через Management API.
     
-    :param user_id: Telegram ID пользователя (используется как ClientID)
+    :param client_id: ClientID из Яндекс.Метрики (yclid или сгенерированный ID)
     :param goal_id: ID цели в Яндекс.Метрике
     :param price: Стоимость конверсии (в рублях)
     :param currency: Валюта (по умолчанию RUB)
+    :param user_id: Опциональный Telegram user_id для логирования
     :return: True если конверсия отправлена успешно, False в противном случае
     """
     if not YANDEX_METRIKA_TOKEN:
         logger.warning("Яндекс.Метрика: токен не настроен, оффлайн-конверсия не отправлена")
         return False
     
+    if not client_id:
+        logger.warning(f"Яндекс.Метрика: ClientID не указан, оффлайн-конверсия {goal_id} не отправлена")
+        return False
+    
     try:
-        client_id = generate_client_id(user_id)
-        
         # Текущее время в UNIX timestamp
         current_timestamp = int(datetime.now().timestamp())
         
@@ -209,14 +213,15 @@ async def send_offline_conversion(
                 response_text = await response.text()
                 
                 if response.status in [200, 201, 202]:
-                    logger.info(f"Оффлайн-конверсия {goal_id} отправлена для user_id={user_id}, price={price} {currency}")
+                    user_log = f"user_id={user_id}, " if user_id else ""
+                    logger.info(f"Оффлайн-конверсия {goal_id} отправлена: {user_log}ClientID={client_id}, price={price} {currency}")
                     return True
                 else:
                     logger.warning(f"Яндекс.Метрика: ошибка {response.status} при отправке оффлайн-конверсии {goal_id}: {response_text}")
                     return False
                     
     except (asyncio.TimeoutError, aiohttp.ServerTimeoutError, aiohttp.ClientConnectionError) as e:
-        logger.warning(f"Яндекс.Метрика: таймаут при отправке оффлайн-конверсии {goal_id} для user_id={user_id}: {e}")
+        logger.warning(f"Яндекс.Метрика: таймаут при отправке оффлайн-конверсии {goal_id} (ClientID={client_id}): {e}")
         return False
     except aiohttp.ClientError as e:
         logger.warning(f"Яндекс.Метрика: сетевая ошибка при отправке оффлайн-конверсии {goal_id}: {e}")
@@ -226,30 +231,83 @@ async def send_offline_conversion(
         return False
 
 
-async def send_offline_conversion_bot_start(user_id: int):
+async def send_offline_conversion_bot_start(client_id: str, user_id: int):
     """
     Отправляет оффлайн-конверсию для цели 'bot_start' (первый запуск бота).
     Goal ID: 508977279
+    
+    :param client_id: ClientID из Яндекс.Метрики (yclid или сгенерированный)
+    :param user_id: Telegram user_id для логирования
     """
-    return await send_offline_conversion(user_id, GOAL_BOT_START, price=0.0, currency="RUB")
+    try:
+        result = await send_offline_conversion(
+            client_id=client_id,
+            goal_id=GOAL_BOT_START,
+            price=0.0,
+            currency="RUB",
+            user_id=user_id
+        )
+        if result:
+            logger.info(f"✅ Конверсия bot_start успешно отправлена для user_id={user_id}, ClientID={client_id}")
+        else:
+            logger.error(f"❌ Не удалось отправить конверсию bot_start для user_id={user_id}")
+        return result
+    except Exception as e:
+        logger.error(f"❌ Ошибка при отправке конверсии bot_start для user_id={user_id}: {e}")
+        return False
 
 
-async def send_offline_conversion_free_period(user_id: int):
+async def send_offline_conversion_free_period(client_id: str, user_id: int):
     """
     Отправляет оффлайн-конверсию для цели 'free_period_start' (активация бесплатного периода).
     Goal ID: 508976625
+    
+    :param client_id: ClientID из Яндекс.Метрики (yclid или сгенерированный)
+    :param user_id: Telegram user_id для логирования
     """
-    return await send_offline_conversion(user_id, GOAL_FREE_PERIOD_START, price=0.0, currency="RUB")
+    try:
+        result = await send_offline_conversion(
+            client_id=client_id,
+            goal_id=GOAL_FREE_PERIOD_START,
+            price=0.0,
+            currency="RUB",
+            user_id=user_id
+        )
+        if result:
+            logger.info(f"✅ Конверсия free_period_start успешно отправлена для user_id={user_id}, ClientID={client_id}")
+        else:
+            logger.error(f"❌ Не удалось отправить конверсию free_period_start для user_id={user_id}")
+        return result
+    except Exception as e:
+        logger.error(f"❌ Ошибка при отправке конверсии free_period_start для user_id={user_id}: {e}")
+        return False
 
 
-async def send_offline_conversion_payment(user_id: int, amount_kopecks: int):
+async def send_offline_conversion_payment(client_id: str, user_id: int, amount_kopecks: int):
     """
     Отправляет оффлайн-конверсию для цели 'premium_payment' (успешная оплата).
     Goal ID: 508976841
     
-    :param user_id: Telegram ID пользователя
+    :param client_id: ClientID из Яндекс.Метрики (yclid или сгенерированный)
+    :param user_id: Telegram user_id для логирования
     :param amount_kopecks: Сумма платежа в копейках (приходит от Telegram Payments)
     """
-    # Конвертируем копейки в рубли
-    amount_rubles = amount_kopecks / 100.0
-    return await send_offline_conversion(user_id, GOAL_PREMIUM_PAYMENT, price=amount_rubles, currency="RUB")
+    try:
+        # Конвертируем копейки в рубли
+        amount_rubles = amount_kopecks / 100.0
+        
+        result = await send_offline_conversion(
+            client_id=client_id,
+            goal_id=GOAL_PREMIUM_PAYMENT,
+            price=amount_rubles,
+            currency="RUB",
+            user_id=user_id
+        )
+        if result:
+            logger.info(f"✅ Конверсия premium_payment успешно отправлена для user_id={user_id}, ClientID={client_id}, price={amount_rubles} RUB")
+        else:
+            logger.error(f"❌ Не удалось отправить конверсию premium_payment для user_id={user_id}")
+        return result
+    except Exception as e:
+        logger.error(f"❌ Ошибка при отправке конверсии premium_payment для user_id={user_id}: {e}")
+        return False
