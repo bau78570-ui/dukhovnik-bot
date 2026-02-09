@@ -21,10 +21,6 @@ def convert_markdown_to_html(text: str, preserve_html_tags: bool = True) -> str:
     if not text:
         return text
     
-    # Сначала декодируем HTML-сущности, которые могли прийти от AI (например, &gt; -> >)
-    # Это предотвращает двойное экранирование (&gt; -> &amp;gt;)
-    text = html.unescape(text)
-    
     html_tags = []
     
     # Защищаем уже существующие HTML-теги от обработки (только если preserve_html_tags=True)
@@ -38,8 +34,15 @@ def convert_markdown_to_html(text: str, preserve_html_tags: bool = True) -> str:
             html_tags.append(tag)
             return f"{html_tag_placeholder_prefix}{len(html_tags) - 1}{html_tag_placeholder_suffix}"
         
-        # Сохраняем существующие HTML-теги
+        # Сохраняем существующие HTML-теги (ПЕРЕД декодированием для безопасности)
         text = re.sub(tag_pattern, save_tag, text)
+    
+    # Декодируем HTML-сущности ТОЛЬКО для недоверенного контента (preserve_html_tags=False)
+    # Это предотвращает двойное экранирование AI-ответов (&gt; -> &amp;gt;)
+    # Для доверенного контента (preserve_html_tags=True) НЕ декодируем, чтобы избежать
+    # превращения безопасных сущностей &lt;script&gt; в опасные теги <script>
+    if not preserve_html_tags:
+        text = html.unescape(text)
     
     # Экранируем специальные символы HTML для безопасной отправки в Telegram
     # Согласно документации Telegram, все &, < и > должны быть экранированы
