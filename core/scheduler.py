@@ -79,9 +79,10 @@ def get_morning_fallback_message(target_date: date) -> tuple[str, str]:
 def parse_morning_ai_response(text: str) -> tuple[str, str] | None:
     if not text:
         return None
-    # Изменено: (?:\s+напутствие\s*[:\-]\s*|$) вместо (?:\n\s*напутствие\s*[:\-]\s*|$)
-    # Теперь работает с любыми пробельными символами (пробелы, переносы строк)
-    prayer_match = re.search(r'(?is)молитва\s*[:\-]\s*(.+?)(?:\s+напутствие\s*[:\-]\s*|$)', text)
+    # Паттерн требует либо перенос строки (\n), либо минимум 2 пробела подряд перед "напутствие:"
+    # Это предотвращает ложные срабатывания на случайное слово "напутствие" внутри текста молитвы
+    # (?:\s*\n+\s*|\s{2,}) = (пробелы + перенос строки + пробелы) ИЛИ (минимум 2 пробела)
+    prayer_match = re.search(r'(?is)молитва\s*[:\-]\s*(.+?)(?:(?:\s*\n+\s*|\s{2,})напутствие\s*[:\-]\s*|$)', text)
     exhort_match = re.search(r'(?is)напутствие\s*[:\-]\s*(.+)$', text)
     if prayer_match and exhort_match:
         prayer_text = prayer_match.group(1).strip()
