@@ -79,10 +79,16 @@ def get_morning_fallback_message(target_date: date) -> tuple[str, str]:
 def parse_morning_ai_response(text: str) -> tuple[str, str] | None:
     if not text:
         return None
-    prayer_match = re.search(r'(?is)молитва\s*[:\-]\s*(.+?)(?:\n\s*напутствие\s*[:\-]\s*|$)', text)
+    # Изменено: (?:\s+напутствие\s*[:\-]\s*|$) вместо (?:\n\s*напутствие\s*[:\-]\s*|$)
+    # Теперь работает с любыми пробельными символами (пробелы, переносы строк)
+    prayer_match = re.search(r'(?is)молитва\s*[:\-]\s*(.+?)(?:\s+напутствие\s*[:\-]\s*|$)', text)
     exhort_match = re.search(r'(?is)напутствие\s*[:\-]\s*(.+)$', text)
     if prayer_match and exhort_match:
-        return prayer_match.group(1).strip(), exhort_match.group(1).strip()
+        prayer_text = prayer_match.group(1).strip()
+        exhort_text = exhort_match.group(1).strip()
+        logging.debug(f"Парсинг AI ответа успешен. Молитва: {len(prayer_text)} символов, Напутствие: {len(exhort_text)} символов")
+        return prayer_text, exhort_text
+    logging.warning(f"Не удалось распарсить AI ответ. Prayer match: {bool(prayer_match)}, Exhort match: {bool(exhort_match)}")
     return None
 
 def sanitize_plain_text(text: str) -> str:
@@ -215,7 +221,12 @@ async def send_morning_notification(bot: Bot):
     Отправляет утреннее уведомление: сначала приветствие с изображением,
     затем православный календарь в том же формате, что и /calendar.
     """
-    logging.info("Начало отправки утренних уведомлений")
+    import traceback
+    logging.info("="*50)
+    logging.info("НАЧАЛО ОТПРАВКИ УТРЕННИХ УВЕДОМЛЕНИЙ")
+    logging.info(f"Время вызова: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logging.info(f"Call stack: {''.join(traceback.format_stack()[-3:-1])}")
+    logging.info("="*50)
 
     today = datetime.now()
     date_str = today.strftime("%Y%m%d")
@@ -295,15 +306,31 @@ async def send_morning_notification(bot: Bot):
     try:
         ai_morning = await get_ai_response(morning_prompt)
         if ai_morning and not is_ai_error(ai_morning):
+            logging.info(f"AI ответ получен, длина: {len(ai_morning)} символов")
+            logging.debug(f"AI ответ (первые 200 символов): {ai_morning[:200]}")
             parsed = parse_morning_ai_response(ai_morning)
             if parsed:
                 morning_prayer, morning_exhortation = parsed
+                logging.info(f"AI ответ успешно распарсен. Молитва: {len(morning_prayer)} символов, Напутствие: {len(morning_exhortation)} символов")
+            else:
+                logging.warning("Не удалось распарсить AI ответ, используется fallback")
+        else:
+            logging.warning(f"AI вернул ошибку или пустой ответ, используется fallback")
     except Exception as e:
         logging.error(f"Ошибка при генерации утреннего текста через AI: {e}")
 
     # Приветствие с изображением
     morning_prayer_clean = strip_section_label(sanitize_plain_text(morning_prayer), "молитва")
     morning_exhortation_clean = strip_section_label(sanitize_plain_text(morning_exhortation), "напутствие")
+    
+    logging.debug(f"После очистки - Молитва: {len(morning_prayer_clean)} символов")
+    logging.debug(f"После очистки - Напутствие (первые 100 символов): {morning_exhortation_clean[:100]}")
+    
+    # Проверяем, не осталась ли метка "Напутствие:" в начале текста
+    if morning_exhortation_clean.lower().startswith("напутствие"):
+        logging.warning(f"⚠️ ВНИМАНИЕ: Метка 'Напутствие:' не была удалена! Текст: {morning_exhortation_clean[:150]}")
+    if morning_prayer_clean.lower().find("напутствие") != -1:
+        logging.warning(f"⚠️ ВНИМАНИЕ: Слово 'напутствие' найдено в тексте молитвы! Позиция: {morning_prayer_clean.lower().find('напутствие')}")
     greeting_prefix = (
         "🌅 <b>Доброе утро!</b>\n\n"
         "🙏 <b>Утренняя молитва:</b>\n"
@@ -363,6 +390,10 @@ async def send_morning_notification(bot: Bot):
                     logging.error(f"Ошибка при отправке утренних уведомлений пользователю {user_id}: {e}")
 
     logging.info(f"Утренние уведомления отправлены: {sent_count} пользователям")
+    logging.info("="*50)
+    logging.info("ЗАВЕРШЕНИЕ ОТПРАВКИ УТРЕННИХ УВЕДОМЛЕНИЙ")
+    logging.info(f"Время завершения: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logging.info("="*50)
 
 async def send_afternoon_notification(bot: Bot):
     """
