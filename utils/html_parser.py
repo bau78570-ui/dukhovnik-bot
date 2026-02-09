@@ -36,10 +36,11 @@ def convert_markdown_to_html(text: str, preserve_html_tags: bool = True) -> str:
         # Сохраняем существующие HTML-теги
         text = re.sub(tag_pattern, save_tag, text)
     
-    # Экранируем специальные символы HTML
+    # Экранируем только символ & для предотвращения конфликтов с HTML-сущностями
+    # Символы < и > НЕ экранируем, так как Telegram корректно обрабатывает их в режиме HTML
+    # и декодирует HTML-сущности при отображении. Экранирование приводит к отображению
+    # &gt; и &lt; в сообщениях вместо > и <
     text = text.replace('&', '&amp;')
-    text = text.replace('<', '&lt;')
-    text = text.replace('>', '&gt;')
     
     # Восстанавливаем сохраненные HTML-теги (только если preserve_html_tags=True)
     if preserve_html_tags:
