@@ -1,6 +1,7 @@
 import re
 import asyncio
 import aiohttp
+import html
 from bs4 import BeautifulSoup
 
 def convert_markdown_to_html(text: str, preserve_html_tags: bool = True) -> str:
@@ -20,6 +21,10 @@ def convert_markdown_to_html(text: str, preserve_html_tags: bool = True) -> str:
     if not text:
         return text
     
+    # Сначала декодируем HTML-сущности, которые могли прийти от AI (например, &gt; -> >)
+    # Это предотвращает двойное экранирование (&gt; -> &amp;gt;)
+    text = html.unescape(text)
+    
     html_tags = []
     
     # Защищаем уже существующие HTML-теги от обработки (только если preserve_html_tags=True)
@@ -36,11 +41,11 @@ def convert_markdown_to_html(text: str, preserve_html_tags: bool = True) -> str:
         # Сохраняем существующие HTML-теги
         text = re.sub(tag_pattern, save_tag, text)
     
-    # Экранируем только символ & для предотвращения конфликтов с HTML-сущностями
-    # Символы < и > НЕ экранируем, так как Telegram корректно обрабатывает их в режиме HTML
-    # и декодирует HTML-сущности при отображении. Экранирование приводит к отображению
-    # &gt; и &lt; в сообщениях вместо > и <
+    # Экранируем специальные символы HTML для безопасной отправки в Telegram
+    # Согласно документации Telegram, все &, < и > должны быть экранированы
     text = text.replace('&', '&amp;')
+    text = text.replace('<', '&lt;')
+    text = text.replace('>', '&gt;')
     
     # Восстанавливаем сохраненные HTML-теги (только если preserve_html_tags=True)
     if preserve_html_tags:
