@@ -190,8 +190,8 @@ async def handle_text_message(message: Message, bot: Bot, state: FSMContext):
         # Сбрасываем состояние пользователя
         await state.clear()
         
-        # Преобразуем Markdown в HTML
-        ai_response = convert_markdown_to_html(ai_response)
+        # Преобразуем Markdown в HTML (без сохранения HTML-тегов для безопасности от AI)
+        ai_response = convert_markdown_to_html(ai_response, preserve_html_tags=False)
         
         # Выбираем случайное изображение из assets/images/daily_word/ для рассылки
         daily_word_images_path = 'assets/images/daily_word/'

@@ -102,8 +102,8 @@ async def get_daily_word_callback_handler(callback: CallbackQuery, bot: Bot, sta
             return
         logging.info("Получен AI-ответ для Слова Дня.")
 
-        # Преобразуем markdown в HTML для ai_reflection
-        ai_reflection_html = convert_markdown_to_html(ai_reflection)
+        # Преобразуем markdown в HTML для ai_reflection (без сохранения HTML-тегов для безопасности от AI)
+        ai_reflection_html = convert_markdown_to_html(ai_reflection, preserve_html_tags=False)
 
         # Обрезаем scripture, если он слишком длинный
         max_scripture_len = 200
@@ -148,7 +148,7 @@ async def get_daily_word_callback_handler(callback: CallbackQuery, bot: Bot, sta
                         ai_reflection = truncated.rsplit(' ', 1)[0] + "..."
                     else:
                         ai_reflection = truncated + "..."
-                    ai_reflection_html = convert_markdown_to_html(ai_reflection)
+                    ai_reflection_html = convert_markdown_to_html(ai_reflection, preserve_html_tags=False)
                     reflection_text = f"✨ {ai_reflection_html}"
         
         # Формируем финальный текст с эмодзи
