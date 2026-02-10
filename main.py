@@ -13,7 +13,7 @@ from aiogram.types.bot_command_scope_chat import BotCommandScopeChat
 from aiogram.fsm.storage.memory import MemoryStorage # Импортируем MemoryStorage
 from dotenv import load_dotenv
 
-from handlers import start, text_handler, premium_content, free_content, callbacks, settings, nameday, dukhovnik_handler, favorites, support_handler, legal_handler
+from handlers import start, text_handler, premium_content, free_content, callbacks, settings, nameday, favorites, support_handler, legal_handler
 from handlers.admin_handler import router as admin_router
 from handlers.subscription import router as subscription_router
 from core.scheduler import scheduler, send_morning_notification, send_afternoon_notification, send_evening_notification, send_subscription_reminder, send_free_period_ending_notification # check_namedays
@@ -57,8 +57,7 @@ async def set_main_menu(bot: Bot):
     print("INFO: Setting main menu commands...")
     main_menu_commands = [
         BotCommand(command="/start", description="🔄 Перезапустить бота"),
-        BotCommand(command="/dukhovnik", description="💬 Поговорить с Духовником"),
-        BotCommand(command="/new_chat", description="✨ Начать новую беседу"),
+        BotCommand(command="/new_chat", description="✨ Начать новую беседу с Духовником"),
         BotCommand(command="/calendar", description="🗓️ Православный календарь"),
         BotCommand(command="/molitva", description="🙏 Молитва"),
         # BotCommand(command="/daily_word", description="📖 Слово дня (Premium)"), # Скрыто - доступно только через уведомления
@@ -136,7 +135,6 @@ async def main() -> None:
     dp.include_router(subscription_router)  # обработчики подписки через Telegram Payments
     dp.include_router(premium_content.router)
     dp.include_router(free_content.router)
-    dp.include_router(dukhovnik_handler.router)
     dp.include_router(favorites.router)
     dp.include_router(callbacks.router)
     dp.include_router(support_handler.router)
