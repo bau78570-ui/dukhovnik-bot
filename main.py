@@ -105,7 +105,11 @@ async def main() -> None:
     existing_jobs = scheduler.get_jobs()
     logging.info(f"📋 Текущих задач в планировщике: {len(existing_jobs)}")
     for job in existing_jobs:
-        logging.info(f"  - Job ID: {job.id}, Trigger: {job.trigger}, Next run: {job.next_run_time}")
+        try:
+            next_run = getattr(job, 'next_run_time', 'N/A')
+        except:
+            next_run = 'N/A'
+        logging.info(f"  - Job ID: {job.id}, Trigger: {job.trigger}, Next run: {next_run}")
     
     # Удаляем старые задачи, если они есть, чтобы избежать дублирования при перезапуске
     removed_count = 0
@@ -156,7 +160,11 @@ async def main() -> None:
     final_jobs = scheduler.get_jobs()
     logging.info(f"📋 Итого задач в планировщике после добавления: {len(final_jobs)}")
     for job in final_jobs:
-        logging.info(f"  - Job ID: {job.id}, Trigger: {job.trigger}, Next run: {job.next_run_time}")
+        try:
+            next_run = getattr(job, 'next_run_time', 'N/A')
+        except:
+            next_run = 'N/A'
+        logging.info(f"  - Job ID: {job.id}, Trigger: {job.trigger}, Next run: {next_run}")
 
     # Запускаем планировщик, если он еще не запущен
     if not scheduler.running:
