@@ -399,7 +399,12 @@ async def send_afternoon_notification(bot: Bot):
     """
     Отправляет дневное уведомление со Словом дня и AI-размышлением (до 200 символов, с источником).
     """
-    logging.info("Начало отправки дневных уведомлений")
+    import traceback
+    logging.info("="*50)
+    logging.info("📖 НАЧАЛО ОТПРАВКИ ДНЕВНЫХ УВЕДОМЛЕНИЙ (СЛОВО ДНЯ)")
+    logging.info(f"Время вызова: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logging.info(f"Call stack: {''.join(traceback.format_stack()[-3:-1])}")
+    logging.info("="*50)
     
     # Получаем тему дня (для контекста)
     azbyka_api_key = os.getenv("AZBYKA_API_KEY")
@@ -504,6 +509,10 @@ async def send_afternoon_notification(bot: Bot):
                     logging.error(f"ERROR: Ошибка при отправке дневного уведомления пользователю {user_id}: {e}")
     
     logging.info(f"Дневные уведомления отправлены: {sent_count} пользователям")
+    logging.info("="*50)
+    logging.info("📖 ЗАВЕРШЕНИЕ ОТПРАВКИ ДНЕВНЫХ УВЕДОМЛЕНИЙ (СЛОВО ДНЯ)")
+    logging.info(f"Время завершения: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logging.info("="*50)
 
 async def send_evening_notification(bot: Bot):
     """

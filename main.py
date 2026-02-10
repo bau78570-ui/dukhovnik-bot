@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import sys # Добавляем импорт sys
+from datetime import datetime
 
 # Проверяем, активно ли виртуальное окружение
 if not hasattr(sys, 'real_prefix') and not (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix):
@@ -93,32 +94,69 @@ async def main() -> None:
     """
     Основная функция для запуска long polling.
     """
+    import traceback
+    logging.info("="*80)
+    logging.info("🚀 ЗАПУСК ФУНКЦИИ main() - НАЧАЛО ИНИЦИАЛИЗАЦИИ БОТА")
+    logging.info(f"Время запуска: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logging.info(f"Call stack:\n{''.join(traceback.format_stack())}")
+    logging.info("="*80)
+    
+    # Выводим все текущие задачи в планировщике
+    existing_jobs = scheduler.get_jobs()
+    logging.info(f"📋 Текущих задач в планировщике: {len(existing_jobs)}")
+    for job in existing_jobs:
+        logging.info(f"  - Job ID: {job.id}, Trigger: {job.trigger}, Next run: {job.next_run_time}")
+    
     # Удаляем старые задачи, если они есть, чтобы избежать дублирования при перезапуске
+    removed_count = 0
     if scheduler.get_job('morning_notification_job'):
         scheduler.remove_job('morning_notification_job')
+        removed_count += 1
+        logging.info("❌ Удалена задача 'morning_notification_job'")
     if scheduler.get_job('afternoon_notification_job'):
         scheduler.remove_job('afternoon_notification_job')
+        removed_count += 1
+        logging.info("❌ Удалена задача 'afternoon_notification_job'")
     if scheduler.get_job('evening_notification_job'):
         scheduler.remove_job('evening_notification_job')
+        removed_count += 1
+        logging.info("❌ Удалена задача 'evening_notification_job'")
     if scheduler.get_job('subscription_reminder_job'):
         scheduler.remove_job('subscription_reminder_job')
+        removed_count += 1
+        logging.info("❌ Удалена задача 'subscription_reminder_job'")
     if scheduler.get_job('free_period_warning_job'):
         scheduler.remove_job('free_period_warning_job')
+        removed_count += 1
+        logging.info("❌ Удалена задача 'free_period_warning_job'")
+    
+    logging.info(f"📊 Удалено старых задач: {removed_count}")
 
     # Добавляем задачи в планировщик с явными ID
-    scheduler.add_job(send_morning_notification, trigger='cron', hour=8, minute=0, args=[bot], timezone='Europe/Moscow', id='morning_notification_job')
-    scheduler.add_job(send_afternoon_notification, trigger='cron', hour=14, minute=0, args=[bot], timezone='Europe/Moscow', id='afternoon_notification_job')
-    scheduler.add_job(send_evening_notification, trigger='cron', hour=20, minute=0, args=[bot], timezone='Europe/Moscow', id='evening_notification_job')
-    scheduler.add_job(send_subscription_reminder, trigger='cron', hour=18, minute=0, args=[bot], timezone='Europe/Moscow', id='subscription_reminder_job')
-    scheduler.add_job(send_free_period_ending_notification, trigger='cron', hour=10, minute=0, args=[bot], timezone='Europe/Moscow', id='free_period_warning_job')
+    logging.info("➕ Добавление новых задач в планировщик...")
+    
+    scheduler.add_job(send_morning_notification, trigger='cron', hour=8, minute=0, args=[bot], timezone='Europe/Moscow', id='morning_notification_job', replace_existing=True)
+    logging.info("✅ Добавлена задача 'morning_notification_job' на 08:00 MSK")
+    
+    scheduler.add_job(send_afternoon_notification, trigger='cron', hour=14, minute=0, args=[bot], timezone='Europe/Moscow', id='afternoon_notification_job', replace_existing=True)
+    logging.info("✅ Добавлена задача 'afternoon_notification_job' на 14:00 MSK")
+    
+    scheduler.add_job(send_evening_notification, trigger='cron', hour=20, minute=0, args=[bot], timezone='Europe/Moscow', id='evening_notification_job', replace_existing=True)
+    logging.info("✅ Добавлена задача 'evening_notification_job' на 20:00 MSK")
+    
+    scheduler.add_job(send_subscription_reminder, trigger='cron', hour=18, minute=0, args=[bot], timezone='Europe/Moscow', id='subscription_reminder_job', replace_existing=True)
+    logging.info("✅ Добавлена задача 'subscription_reminder_job' на 18:00 MSK")
+    
+    scheduler.add_job(send_free_period_ending_notification, trigger='cron', hour=10, minute=0, args=[bot], timezone='Europe/Moscow', id='free_period_warning_job', replace_existing=True)
+    logging.info("✅ Добавлена задача 'free_period_warning_job' на 10:00 MSK")
+    
     # scheduler.add_job(check_namedays, trigger='cron', hour=7, minute=0, args=(bot,)) # Запускаем проверку именин в 7 утра
-
-    # Логируем информацию о запланированных задачах (без next_run_time, чтобы избежать ошибки)
-    logging.info(f"Job 'morning_notification_job' added for 08:00 MSK.")
-    logging.info(f"Job 'afternoon_notification_job' added for 14:00 MSK.")
-    logging.info(f"Job 'evening_notification_job' added for 20:00 MSK.")
-    logging.info(f"Job 'subscription_reminder_job' added for 18:00 MSK.")
-    logging.info(f"Job 'free_period_warning_job' added for 10:00 MSK.")
+    
+    # Выводим финальное состояние планировщика
+    final_jobs = scheduler.get_jobs()
+    logging.info(f"📋 Итого задач в планировщике после добавления: {len(final_jobs)}")
+    for job in final_jobs:
+        logging.info(f"  - Job ID: {job.id}, Trigger: {job.trigger}, Next run: {job.next_run_time}")
 
     # Запускаем планировщик, если он еще не запущен
     if not scheduler.running:
