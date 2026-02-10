@@ -235,9 +235,9 @@ async def subscribe_handler(message: Message, bot: Bot, state: FSMContext):
                     "Оформите Premium-подписку сейчас по специальной цене:\n\n"
                 )
                 keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="1 месяц — 399 руб", callback_data="subscribe_1month")],
-                    [InlineKeyboardButton(text="3 месяца — 999 руб (-17%)", callback_data="subscribe_3month")],
-                    [InlineKeyboardButton(text="Год — 3490 руб (-27%)", callback_data="subscribe_12month")]
+                    [InlineKeyboardButton(text="1 месяц — 199 руб", callback_data="subscribe_1month")],
+                    [InlineKeyboardButton(text="3 месяца — 499 руб (-17%)", callback_data="subscribe_3month")],
+                    [InlineKeyboardButton(text="Год — 1749 руб (-27%)", callback_data="subscribe_12month")]
                 ])
                 await message.answer(status_text, parse_mode='HTML', reply_markup=keyboard)
             else:
@@ -260,9 +260,9 @@ async def subscribe_handler(message: Message, bot: Bot, state: FSMContext):
             )
             
             keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="1 месяц — 399 руб", callback_data="subscribe_1month")],
-                [InlineKeyboardButton(text="3 месяца — 999 руб (экономия 198 руб)", callback_data="subscribe_3month")],
-                [InlineKeyboardButton(text="Год — 3490 руб (экономия 1298 руб)", callback_data="subscribe_12month")]
+                [InlineKeyboardButton(text="1 месяц — 199 руб", callback_data="subscribe_1month")],
+                [InlineKeyboardButton(text="3 месяца — 499 руб (экономия 98 руб)", callback_data="subscribe_3month")],
+                [InlineKeyboardButton(text="Год — 1749 руб (экономия 639 руб)", callback_data="subscribe_12month")]
             ])
             
             await message.answer(expired_text, parse_mode='HTML', reply_markup=keyboard)
@@ -468,7 +468,7 @@ async def subscribe_1month_handler(callback_query: CallbackQuery, bot: Bot, stat
         return
     
     try:
-        await send_invoice_for_tariff(bot, callback_query.message.chat.id, user_id, "1month", 39900, 30)
+        await send_invoice_for_tariff(bot, callback_query.message.chat.id, user_id, "1month", 19900, 30)
         await callback_query.answer()
     except Exception as e:
         logger.exception(e)
@@ -500,7 +500,7 @@ async def subscribe_3month_handler(callback_query: CallbackQuery, bot: Bot, stat
         return
     
     try:
-        await send_invoice_for_tariff(bot, callback_query.message.chat.id, user_id, "3month", 99900, 90)
+        await send_invoice_for_tariff(bot, callback_query.message.chat.id, user_id, "3month", 49900, 90)
         await callback_query.answer()
     except Exception as e:
         logger.exception(e)
@@ -532,7 +532,7 @@ async def subscribe_12month_handler(callback_query: CallbackQuery, bot: Bot, sta
         return
     
     try:
-        await send_invoice_for_tariff(bot, callback_query.message.chat.id, user_id, "12month", 349000, 365)
+        await send_invoice_for_tariff(bot, callback_query.message.chat.id, user_id, "12month", 174900, 365)
         await callback_query.answer()
     except Exception as e:
         logger.exception(e)
@@ -592,7 +592,7 @@ async def subscribe_callback_handler(callback_query: CallbackQuery, bot: Bot, st
                         "description": "Premium «Духовник» на 1 месяц",
                         "quantity": "1",
                         "amount": {
-                            "value": "399.00",
+                            "value": "199.00",
                             "currency": "RUB"
                         },
                         "vat_code": 6,  # Для самозанятых на НПД (без НДС)
@@ -621,7 +621,7 @@ async def subscribe_callback_handler(callback_query: CallbackQuery, bot: Bot, st
             payload=payload,
             provider_token=provider_token,
             currency="RUB",
-            prices=[LabeledPrice(label="Premium 30 дней", amount=39900)],  # 399 рублей = 39900 копеек
+            prices=[LabeledPrice(label="Premium 30 дней", amount=19900)],  # 199 рублей = 19900 копеек
             provider_data=provider_data_json
         )
         
