@@ -6,6 +6,7 @@ from states import PrayerState # Импортируем состояния
 from core.calendar_data import get_calendar_data
 import logging # Импортируем logging
 from datetime import datetime, timedelta
+import asyncio
 import os # Импортируем os для работы с путями файлов
 import random # Импортируем random для выбора случайного изображения
 from core.content_sender import send_and_delete_previous # Импортируем новую централизованную функцию
@@ -163,20 +164,33 @@ async def handle_text_message(message: Message, bot: Bot, state: FSMContext):
         prayer_topic = user_data.get('prayer_topic')
         user_prayer_details = message.text
 
-        # Показываем индикатор "печатает..."
-        await bot.send_chat_action(chat_id, "typing")
+        # Показываем индикатор "печатает..." и держим его, пока ждём ответ API (Telegram скрывает его через ~5 сек)
+        async def _typing_loop():
+            try:
+                while True:
+                    await bot.send_chat_action(chat_id, "typing")
+                    await asyncio.sleep(4)
+            except asyncio.CancelledError:
+                pass
 
-        # Формируем специальный промт для get_ai_response
-        prompt = (
-            f"Сгенерируй текст православной молитвы в позитивном, вдохновляющем стиле (Норман Пил) на тему '{prayer_topic}' "
-            f"с учетом следующей просьбы пользователя: '{user_prayer_details}'. "
-            f"Молитва должна быть на современном русском языке, канонически православно корректной и включать обращение, "
-            f"прошение, благодарение. Текст должен быть объемным (до 500 символов), глубоким, добрым и человечным. "
-            f"Должно оставаться ощущение будто молитва написана батюшкой из руской православной церкви."
-        )
-        
-        # Получаем ответ от AI
-        ai_response = await get_ai_response(prompt)
+        typing_task = asyncio.create_task(_typing_loop())
+        try:
+            # Формируем специальный промт для get_ai_response
+            prompt = (
+                f"Сгенерируй текст православной молитвы в позитивном, вдохновляющем стиле (Норман Пил) на тему '{prayer_topic}' "
+                f"с учетом следующей просьбы пользователя: '{user_prayer_details}'. "
+                f"Молитва должна быть на современном русском языке, канонически православно корректной и включать обращение, "
+                f"прошение, благодарение. Текст должен быть объемным (до 500 символов), глубоким, добрым и человечным. "
+                f"Должно оставаться ощущение будто молитва написана батюшкой из руской православной церкви."
+            )
+            # max_tokens=400 ускоряет ответ API (молитва до ~500 символов ≈ 300–400 токенов)
+            ai_response = await get_ai_response(prompt, max_tokens=400)
+        finally:
+            typing_task.cancel()
+            try:
+                await typing_task
+            except asyncio.CancelledError:
+                pass
         
         # Проверяем, не произошла ли ошибка
         if not ai_response or ai_response.startswith("Ошибка") or ai_response.startswith("Произошла ошибка"):
