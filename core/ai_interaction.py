@@ -135,7 +135,11 @@ async def get_ai_response(user_message: str, conversation_history: list = None, 
             async with session.post(url, headers=headers, json=payload) as response:
                 if response.status == 200:
                     data = await response.json()
-                    return data['choices'][0]['message']['content']
+                    try:
+                        content = data.get('choices', [{}])[0].get('message', {}).get('content')
+                        return content if content is not None else "Ошибка: пустой ответ от AI."
+                    except (IndexError, KeyError, TypeError) as e:
+                        return f"Ошибка при разборе ответа AI: {e}"
                 else:
                     error_text = await response.text()
                     return f"Ошибка API: {response.status} - {error_text}"

@@ -1,5 +1,6 @@
 from aiogram import Router, F, Bot
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from aiogram.enums import ParseMode
 from aiogram.fsm.context import FSMContext # Импортируем FSMContext
 from core.ai_interaction import get_ai_response
 from states import PrayerState # Импортируем состояния
@@ -195,7 +196,7 @@ async def handle_text_message(message: Message, bot: Bot, state: FSMContext):
         # Проверяем, не произошла ли ошибка
         if not ai_response or ai_response.startswith("Ошибка") or ai_response.startswith("Произошла ошибка"):
             await message.answer(
-                "😔 Извините, произошла ошибка при генерации молитвы. Попробуйте еще раз через /prayer",
+                "😔 Извините, произошла ошибка при генерации молитвы. Попробуйте еще раз через /molitva",
                 parse_mode='HTML'
             )
             await state.clear()
@@ -203,54 +204,53 @@ async def handle_text_message(message: Message, bot: Bot, state: FSMContext):
         
         # Сбрасываем состояние пользователя
         await state.clear()
-        
-        # Преобразуем Markdown в HTML (без сохранения HTML-тегов для безопасности от AI)
-        ai_response = convert_markdown_to_html(ai_response, preserve_html_tags=False)
-        
-        # Выбираем случайное изображение из assets/images/daily_word/ для рассылки
-        daily_word_images_path = 'assets/images/daily_word/'
-        fallback_image_name = 'logo.png' # Запасное изображение
-        image_to_send_name = fallback_image_name
+
         try:
+            # Преобразуем Markdown в HTML (без сохранения HTML-тегов для безопасности от AI)
+            ai_response = convert_markdown_to_html(ai_response, preserve_html_tags=False)
+            
+            # Выбираем случайное изображение из assets/images/daily_word/
+            daily_word_images_path = 'assets/images/daily_word/'
+            fallback_image_name = 'logo.png'
+            image_to_send_name = fallback_image_name
             if os.path.exists(daily_word_images_path) and os.listdir(daily_word_images_path):
                 image_files = [f for f in os.listdir(daily_word_images_path) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
                 if image_files:
                     random_image = random.choice(image_files)
-                    image_to_send_name = os.path.join('daily_word', random_image) # Путь относительно assets/images/
+                    image_to_send_name = os.path.join('daily_word', random_image)
                     logging.info(f"Выбрано изображение для молитвы: {image_to_send_name}")
-                else:
-                    logging.warning(f"WARNING: В папке {daily_word_images_path} нет подходящих изображений для молитвы. Используется запасное.")
-            else:
-                os.makedirs(daily_word_images_path, exist_ok=True)
-                logging.warning(f"WARNING: Папка {daily_word_images_path} не найдена или пуста для молитвы. Используется запасное изображение.")
+            
+            # Добавляем заголовок; подпись к фото в Telegram — не более 1024 символов
+            MAX_CAPTION_LEN = 1024
+            formatted_response = f"🙏 <b>Ваша молитва ({prayer_topic.lower()})</b>\n\n{ai_response}"
+            if len(formatted_response) > MAX_CAPTION_LEN:
+                formatted_response = formatted_response[:MAX_CAPTION_LEN - 3].rstrip() + "..."
+            
+            sent = await send_and_delete_previous(
+                bot=bot,
+                chat_id=chat_id,
+                state=state,
+                text=formatted_response,
+                image_name=image_to_send_name,
+                reply_markup=get_favorite_keyboard(message.message_id),
+                delete_previous=False,
+                track_last_message=False
+            )
+            if sent is None:
+                # Отправка с фото не удалась (например, нет файла) — отправляем только текст
+                await bot.send_message(
+                    chat_id=chat_id,
+                    text=formatted_response,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=get_favorite_keyboard(message.message_id)
+                )
         except Exception as e:
-            logging.error(f"ERROR: Ошибка при выборе изображения для молитвы: {e}. Используется запасное.")
-
-        # Обрезаем scripture, если он слишком длинный (хотя в этом хендлере scripture не используется напрямую в final_text,
-        # но это может быть полезно для будущих изменений или если AI-ответ будет включать scripture)
-        # В данном случае, scripture используется в промте, но не в конечном formatted_response.
-        # Однако, для единообразия и предотвращения потенциальных проблем с длиной,
-        # можно было бы обрезать и здесь, если бы scripture напрямую вставлялся в formatted_response.
-        # Поскольку formatted_response состоит из заголовка и ai_response, и ai_response уже ограничен до 200 символов,
-        # то проблема длины подписи, скорее всего, не в этом месте.
-        # Проблема, вероятно, в том, что AI-ответ все еще слишком длинный, несмотря на ограничение в промте.
-        # Уменьшим ограничение для AI-ответа еще сильнее.
-
-        # Добавляем заголовок к сгенерированной молитве
-        formatted_response = f"🙏 <b>Ваша молитва ({prayer_topic.lower()})</b>\n\n{ai_response}"
-        
-        # Отправляем сообщение с изображением, используя новую централизованную функцию
-        await send_and_delete_previous(
-            bot=bot,
-            chat_id=chat_id,
-            state=state,
-            text=formatted_response,
-            image_name=image_to_send_name,
-            reply_markup=get_favorite_keyboard(message.message_id), # Добавляем кнопку "В избранное"
-            delete_previous=False,
-            track_last_message=False
-        )
-        return # Прекращаем дальнейшую обработку этого сообщения
+            logging.exception(f"Ошибка при отправке молитвы user_id={user_id}: {e}")
+            await message.answer(
+                "😔 Не удалось отправить молитву. Попробуйте ещё раз: /molitva",
+                parse_mode='HTML'
+            )
+        return
 
     # Календарь запрашивается отдельной командой /calendar
 
