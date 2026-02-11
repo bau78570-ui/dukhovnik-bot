@@ -159,13 +159,17 @@ async def handle_text_message(message: Message, bot: Bot, state: FSMContext):
     # Проверяем текущее состояние FSM
     current_state = await state.get_state()
 
-    if current_state == PrayerState.waiting_for_details:
-        # Если пользователь в режиме ожидания деталей молитвы
+    # Сравниваем и по строке (get_state() возвращает строку типа "PrayerState:waiting_for_details")
+    is_prayer_state = (
+        current_state == PrayerState.waiting_for_details
+        or (current_state and str(current_state).startswith("PrayerState"))
+    )
+    if is_prayer_state:
         user_data = await state.get_data()
-        prayer_topic = user_data.get('prayer_topic')
-        user_prayer_details = message.text
+        prayer_topic = user_data.get('prayer_topic') or 'молитва'
+        user_prayer_details = (message.text or '').strip() or 'о здравии'
+        await state.clear()
 
-        # Показываем индикатор "печатает..." и держим его, пока ждём ответ API (Telegram скрывает его через ~5 сек)
         async def _typing_loop():
             try:
                 while True:
@@ -175,81 +179,57 @@ async def handle_text_message(message: Message, bot: Bot, state: FSMContext):
                 pass
 
         typing_task = asyncio.create_task(_typing_loop())
+        ai_response = None
         try:
-            # Формируем специальный промт для get_ai_response
             prompt = (
                 f"Сгенерируй текст православной молитвы в позитивном, вдохновляющем стиле (Норман Пил) на тему '{prayer_topic}' "
                 f"с учетом следующей просьбы пользователя: '{user_prayer_details}'. "
                 f"Молитва должна быть на современном русском языке, канонически православно корректной и включать обращение, "
-                f"прошение, благодарение. Текст должен быть объемным (до 500 символов), глубоким, добрым и человечным. "
-                f"Должно оставаться ощущение будто молитва написана батюшкой из руской православной церкви."
+                f"прошение, благодарение. Текст до 500 символов, глубокий и добрый."
             )
-            # max_tokens=400 ускоряет ответ API (молитва до ~500 символов ≈ 300–400 токенов)
             ai_response = await get_ai_response(prompt, max_tokens=400)
+        except Exception as e:
+            logging.exception(f"get_ai_response в модуле Молитва user_id={user_id}: {e}")
+            ai_response = None
         finally:
             typing_task.cancel()
             try:
                 await typing_task
             except asyncio.CancelledError:
                 pass
-        
-        # Проверяем, не произошла ли ошибка
+
         if not ai_response or ai_response.startswith("Ошибка") or ai_response.startswith("Произошла ошибка"):
             await message.answer(
-                "😔 Извините, произошла ошибка при генерации молитвы. Попробуйте еще раз через /molitva",
-                parse_mode='HTML'
+                "😔 Извините, произошла ошибка при генерации молитвы. Попробуйте ещё раз: /molitva",
+                parse_mode=ParseMode.HTML
             )
-            await state.clear()
             return
-        
-        # Сбрасываем состояние пользователя
-        await state.clear()
 
         try:
-            # Преобразуем Markdown в HTML (без сохранения HTML-тегов для безопасности от AI)
             ai_response = convert_markdown_to_html(ai_response, preserve_html_tags=False)
-            
-            # Выбираем случайное изображение из assets/images/daily_word/
-            daily_word_images_path = 'assets/images/daily_word/'
-            fallback_image_name = 'logo.png'
-            image_to_send_name = fallback_image_name
-            if os.path.exists(daily_word_images_path) and os.listdir(daily_word_images_path):
-                image_files = [f for f in os.listdir(daily_word_images_path) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
-                if image_files:
-                    random_image = random.choice(image_files)
-                    image_to_send_name = os.path.join('daily_word', random_image)
-                    logging.info(f"Выбрано изображение для молитвы: {image_to_send_name}")
-            
-            # Добавляем заголовок; подпись к фото в Telegram — не более 1024 символов
-            MAX_CAPTION_LEN = 1024
-            formatted_response = f"🙏 <b>Ваша молитва ({prayer_topic.lower()})</b>\n\n{ai_response}"
-            if len(formatted_response) > MAX_CAPTION_LEN:
-                formatted_response = formatted_response[:MAX_CAPTION_LEN - 3].rstrip() + "..."
-            
-            sent = await send_and_delete_previous(
-                bot=bot,
-                chat_id=chat_id,
-                state=state,
-                text=formatted_response,
-                image_name=image_to_send_name,
-                reply_markup=get_favorite_keyboard(message.message_id),
-                delete_previous=False,
-                track_last_message=False
-            )
-            if sent is None:
-                # Отправка с фото не удалась (например, нет файла) — отправляем только текст
-                await bot.send_message(
-                    chat_id=chat_id,
-                    text=formatted_response,
-                    parse_mode=ParseMode.HTML,
-                    reply_markup=get_favorite_keyboard(message.message_id)
-                )
-        except Exception as e:
-            logging.exception(f"Ошибка при отправке молитвы user_id={user_id}: {e}")
+            header = f"🙏 <b>Ваша молитва ({prayer_topic.lower()})</b>\n\n"
+            text_to_send = header + ai_response
+            if len(text_to_send) > 1024:
+                text_to_send = text_to_send[:1021].rstrip() + "..."
+
+            # Сначала всегда отправляем текстом — гарантированная доставка
             await message.answer(
-                "😔 Не удалось отправить молитву. Попробуйте ещё раз: /molitva",
-                parse_mode='HTML'
+                text_to_send,
+                parse_mode=ParseMode.HTML,
+                reply_markup=get_favorite_keyboard(message.message_id)
             )
+        except Exception as e:
+            logging.exception(f"Отправка молитвы user_id={user_id}: {e}")
+            try:
+                await message.answer(
+                    "🙏 <b>Ваша молитва</b>\n\n" + ai_response[:4000],
+                    parse_mode=ParseMode.HTML
+                )
+            except Exception:
+                await message.answer(
+                    "😔 Не удалось отправить молитву. Попробуйте ещё раз: /molitva",
+                    parse_mode=ParseMode.HTML
+                )
         return
 
     # Календарь запрашивается отдельной командой /calendar
