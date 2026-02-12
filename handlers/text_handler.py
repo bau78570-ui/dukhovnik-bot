@@ -209,31 +209,44 @@ async def handle_text_message(message: Message, bot: Bot, state: FSMContext):
             )
             return
 
-        try:
-            ai_response = convert_markdown_to_html(ai_response, preserve_html_tags=False)
-            header = f"🙏 <b>Ваша молитва ({prayer_topic.lower()})</b>\n\n"
-            text_to_send = header + ai_response
-            if len(text_to_send) > 1024:
-                text_to_send = text_to_send[:1021].rstrip() + "..."
-
-            # Сначала всегда отправляем текстом — гарантированная доставка
-            await message.answer(
-                text_to_send,
-                parse_mode=ParseMode.HTML,
-                reply_markup=get_favorite_keyboard(message.message_id)
-            )
-        except Exception as e:
-            logging.exception(f"Отправка молитвы user_id={user_id}: {e}")
+        async def _send_prayer(text: str, use_html: bool = True) -> bool:
+            """Отправляет молитву, при ошибке с HTML пробует без HTML. Возвращает True если успешно."""
             try:
-                await message.answer(
-                    "🙏 <b>Ваша молитва</b>\n\n" + ai_response[:4000],
-                    parse_mode=ParseMode.HTML
-                )
+                if use_html:
+                    await message.answer(
+                        text,
+                        parse_mode=ParseMode.HTML,
+                        reply_markup=get_favorite_keyboard(message.message_id)
+                    )
+                else:
+                    await message.answer(
+                        text,
+                        reply_markup=get_favorite_keyboard(message.message_id)
+                    )
+                return True
+            except Exception as e:
+                logging.warning(f"Отправка молитвы (html={use_html}) user_id={user_id}: {e}")
+                return False
+
+        try:
+            ai_clean = convert_markdown_to_html(ai_response, preserve_html_tags=False)
+            header = f"🙏 <b>Ваша молитва ({prayer_topic.lower()})</b>\n\n"
+            text_to_send = header + ai_clean
+            if len(text_to_send) > 4096:
+                text_to_send = text_to_send[:4093].rstrip() + "..."
+
+            sent = await _send_prayer(text_to_send, use_html=True)
+            if not sent:
+                text_plain = f"🙏 Ваша молитва ({prayer_topic.lower()})\n\n" + ai_response[:4000]
+                sent = await _send_prayer(text_plain, use_html=False)
+            if not sent:
+                await message.answer("😔 Не удалось отправить молитву. Попробуйте ещё раз: /molitva")
+        except Exception as e:
+            logging.exception(f"Молитва user_id={user_id}: {e}")
+            try:
+                await message.answer(f"🙏 Ваша молитва\n\n{ai_response[:4000]}")
             except Exception:
-                await message.answer(
-                    "😔 Не удалось отправить молитву. Попробуйте ещё раз: /molitva",
-                    parse_mode=ParseMode.HTML
-                )
+                await message.answer("😔 Не удалось отправить молитву. Попробуйте ещё раз: /molitva")
         return
 
     # Календарь запрашивается отдельной командой /calendar
