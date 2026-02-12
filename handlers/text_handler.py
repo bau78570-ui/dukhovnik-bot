@@ -168,7 +168,11 @@ async def handle_text_message(message: Message, bot: Bot, state: FSMContext):
         user_data = await state.get_data()
         prayer_topic = user_data.get('prayer_topic') or 'молитва'
         user_prayer_details = (message.text or '').strip() or 'о здравии'
+        # Убираем кавычки, чтобы не ломать f-строку в промте
+        user_prayer_details = user_prayer_details.replace("'", "").replace('"', '')[:500]
         await state.clear()
+
+        logging.info(f"Молитва: user_id={user_id}, тема={prayer_topic}, детали={user_prayer_details[:50]}...")
 
         async def _typing_loop():
             try:

@@ -41,18 +41,26 @@ async def prayer_topic_selection_handler(callback: CallbackQuery, bot: Bot, stat
         await callback.answer("Произошла ошибка при выборе темы молитвы.", show_alert=True)
         return
 
-    if callback.message.photo:
-        await callback.message.edit_caption(
-            caption=prompt_text,
-            parse_mode='HTML'
-        )
-    else:
-        await callback.message.edit_text(
-            text=prompt_text,
-            parse_mode='HTML'
-        )
+    # Сначала сохраняем состояние — так оно не потеряется при сбое редактирования
     await state.set_state(PrayerState.waiting_for_details)
     await state.update_data(prayer_topic=topic_text)
+
+    try:
+        if callback.message.photo:
+            await callback.message.edit_caption(
+                caption=prompt_text,
+                parse_mode='HTML'
+            )
+        else:
+            await callback.message.edit_text(
+                text=prompt_text,
+                parse_mode='HTML'
+            )
+    except Exception as e:
+        import logging
+        logging.warning(f"Не удалось отредактировать сообщение при выборе темы молитвы {topic_key}: {e}")
+        # Отправляем новый текст, если редактирование не удалось
+        await callback.message.answer(prompt_text, parse_mode='HTML')
     await callback.answer()
 
 

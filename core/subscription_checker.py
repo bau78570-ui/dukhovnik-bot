@@ -221,6 +221,7 @@ class AccessCheckerMiddleware(BaseMiddleware):
             'fav_',  # Избранное - навигация (fav_page_, fav_delete_)
             'favorite_',  # Избранное - добавление сообщения в избранное
             'unfavorite_',  # Избранное - удаление сообщения из избранного
+            'prayer_topic:',  # Выбор темы молитвы (health, work, family, custom)
         ]
         
         # Проверяем callback-запросы для разрешенных действий
@@ -256,7 +257,8 @@ class AccessCheckerMiddleware(BaseMiddleware):
                             logging.info(f"INFO: User is in support state. Access GRANTED for support message.")
                             print("--- Access Check Finished ---\n")
                             return await handler(event, data)
-                    elif current_state == PrayerState.waiting_for_details:
+                    elif (current_state == PrayerState.waiting_for_details or
+                          (current_state and str(current_state).startswith("PrayerState"))):
                         # Пользователь уже выбрал тему молитвы, разрешаем отправку деталей
                         print(f"INFO: User is in prayer details state. Access GRANTED for prayer message.")
                         logging.info(f"INFO: User is in prayer details state. Access GRANTED for prayer message.")
