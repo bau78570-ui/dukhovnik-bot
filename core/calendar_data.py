@@ -60,7 +60,8 @@ async def fetch_and_cache_calendar_data(date_str: str):
             final_calendar_data.update(azbyka_data)
             print(f"INFO: Данные получены из Azbyka.ru для {date_str}")
     
-    # Всегда пытаемся получить данные с pravoslavie.ru для дополнения, особенно для theophan_thoughts и image_url
+    # Всегда пытаемся получить данные с pravoslavie.ru для дополнения (theophan_thoughts и др.)
+    # image_url с pravoslavie.ru не используем — избегаем претензий по авторским правам
     old_style_date_obj = convert_new_style_to_old_style(current_date_obj)
     old_style_date_str = old_style_date_obj.strftime("%Y%m%d")
     pravoslavie_new_style_equivalent_url = f"{PRAVOSLAVIE_BASE_URL}{old_style_date_str}.html"
@@ -73,11 +74,9 @@ async def fetch_and_cache_calendar_data(date_str: str):
     if pravoslavie_new_style_equivalent_html_content:
         pravoslavie_data = parse_pravoslavie_calendar_page(pravoslavie_new_style_equivalent_html_content)
         if pravoslavie_data:
-            # Приоритет для theophan_thoughts и image_url из pravoslavie.ru
+            # Приоритет для theophan_thoughts из pravoslavie.ru (image_url не берём)
             if pravoslavie_data.get("theophan_thoughts"):
                 final_calendar_data["theophan_thoughts"] = pravoslavie_data["theophan_thoughts"]
-            if pravoslavie_data.get("image_url"):
-                final_calendar_data["image_url"] = pravoslavie_data["image_url"]
             
             # Дополняем остальные поля, если они не были заполнены Azbyka
             if not final_calendar_data["holidays"] and pravoslavie_data["holidays"]:
@@ -95,6 +94,9 @@ async def fetch_and_cache_calendar_data(date_str: str):
     if not final_calendar_data["holidays"] and not final_calendar_data["namedays"]:
         final_calendar_data["holidays"] = ["Сегодня больших праздников не найдено."]
         final_calendar_data["namedays"] = ["Сегодня именин не найдено."]
+
+    # image_url всегда None — не используем изображения с внешних сайтов
+    final_calendar_data["image_url"] = None
 
     cached_calendar_data[date_str] = final_calendar_data
     return final_calendar_data
