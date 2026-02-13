@@ -95,7 +95,7 @@ async def fetch_and_cache_calendar_data(date_str: str):
         final_calendar_data["holidays"] = ["Сегодня больших праздников не найдено."]
         final_calendar_data["namedays"] = ["Сегодня именин не найдено."]
 
-    # image_url всегда None — изображения календаря берём только из assets/images/ (logo.png, daily_quote.png)
+    # image_url всегда None — не парсим и не скачиваем изображения с сайтов, используем локальные из daily_word
     final_calendar_data["image_url"] = None
 
     cached_calendar_data[date_str] = final_calendar_data

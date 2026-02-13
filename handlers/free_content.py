@@ -82,8 +82,8 @@ async def calendar_handler(message: Message, bot: Bot, state: FSMContext):
             f"{holidays_text}"
             f"ℹ️ <b>Пост:</b> {calendar_data.get('fasting', 'Информация о посте не найдена.')}\n\n"
             f"🏛️ <b>Седмица:</b> {calendar_data.get('week_info', 'Информация о седмице не найдена.')}\n\n"
-            f"{namedays_text}" +
-            f"_Данные предоставлены pravoslavie.ru и azbyka.ru_"
+            f"{namedays_text}"
+            f"Данные предоставлены <a href=\"https://pravoslavie.ru\">pravoslavie.ru</a> и <a href=\"https://azbyka.ru\">azbyka.ru</a>"
         )
 
         builder = InlineKeyboardBuilder()

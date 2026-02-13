@@ -235,13 +235,7 @@ def parse_pravoslavie_calendar_page(html_content: str) -> dict:
         if fasting_text_element:
             calendar_data["fasting"] = fasting_text_element.strip()
 
-    # Извлечение основного изображения святого
-    main_image_element = soup.select_one('div.DD_ICON img.DI')
-    if main_image_element and main_image_element.has_attr('src'):
-        image_src = main_image_element['src']
-        if not image_src.startswith('http'):
-            image_src = "https://days.pravoslavie.ru" + image_src
-        calendar_data["image_url"] = image_src
+    # Изображения с pravoslavie.ru не парсим и не сохраняем — используем локальные из daily_word
 
     # Извлечение мыслей Феофана Затворника
     theophan_thoughts_elements = soup.select('div.DD_FEOFAN p.DP_FEOF')
@@ -352,12 +346,6 @@ def parse_azbyka_calendar_page(html_content: str) -> dict:
                 if thought and len(thought) > 20 and "Феофан" not in thought:
                     calendar_data["theophan_thoughts"].append(thought)
 
-    # Извлечение изображения (не используем — calendar_data.image_url обнуляется в calendar_data.py)
-    image_element = soup.select_one('div.days-main-info__image img')
-    if image_element and image_element.has_attr('src'):
-        image_src = image_element['src']
-        if not image_src.startswith('http'):
-            image_src = "https://azbyka.ru" + image_src
-        calendar_data["image_url"] = image_src
+    # Изображения с azbyka.ru не парсим и не сохраняем — используем локальные из daily_word
 
     return calendar_data
