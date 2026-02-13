@@ -19,6 +19,11 @@ async def send_content_message(bot: Bot, chat_id: int, text: str, image_name: st
     """
     html_text = convert_markdown_to_html(text)
     
+    # Не используем изображения с pravoslavie.ru (риск претензий по авторским правам)
+    if image_name and ('pravoslavie.ru' in image_name or 'days.pravoslavie' in image_name):
+        logging.info(f"Пропуск изображения с pravoslavie.ru: {image_name[:80]}...")
+        image_name = None
+    
     try:
         if image_name:
             # Проверяем, является ли image_name URL

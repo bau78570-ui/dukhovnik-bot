@@ -89,7 +89,7 @@ async def calendar_handler(message: Message, bot: Bot, state: FSMContext):
         
         # Используем изображение из базы бота (daily_word), не с pravoslavie.ru
         morning_image_filename = pick_daily_word_image_filename()
-        calendar_image = f"daily_word/{morning_image_filename}" if morning_image_filename else None
+        calendar_image = f"daily_word/{morning_image_filename}" if morning_image_filename else "logo.png"
         
         await send_and_delete_previous(
             bot=bot,
