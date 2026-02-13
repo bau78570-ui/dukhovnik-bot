@@ -13,6 +13,7 @@ from aiogram.fsm.context import FSMContext # Импортируем FSMContext
 from core.content_sender import send_and_delete_previous, send_content_message # Импортируем новую централизованную функцию
 from core.calendar_data import get_calendar_data, fetch_and_cache_calendar_data
 from core.scheduler import pick_daily_word_image_filename
+from core.image_utils import pick_local_image
 from core.user_database import get_user # Импортируем get_user
 from core.subscription_checker import activate_trial # Импортируем activate_trial
 from core.yandex_metrika import track_feature_used # Импортируем Яндекс.Метрику
@@ -164,11 +165,13 @@ async def molitva_handler(message: Message, bot: Bot, state: FSMContext):
     builder.button(text="Своими словами", callback_data="prayer_topic:custom")
     builder.adjust(2)
 
+    # Изображение только из нашей базы: daily_quote.png → daily_word/ → logo.png
+    molitva_image = pick_local_image(prefer='daily_quote.png')
     sent_message = await send_content_message(
         bot=bot,
         chat_id=message.chat.id,
         text=text,
-        image_name='daily_quote.png',
+        image_name=molitva_image,
         reply_markup=builder.as_markup()
     )
     if sent_message:

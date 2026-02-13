@@ -270,14 +270,13 @@ def parse_azbyka_calendar_page(html_content: str) -> dict:
     soup = BeautifulSoup(html_content, 'html.parser')
 
     calendar_data = {
-        "main_holiday": None, 
+        "main_holiday": None,
         "holidays": [],
         "fasting": "Поста нет.",
         "namedays": [],
-        "week_info": "", 
-        "theophan_thoughts": [], 
-        "image_url": None, # Добавляем image_url
-        "theophan_thoughts": [] 
+        "week_info": "",
+        "theophan_thoughts": [],
+        "image_url": None,
     }
 
     # Извлечение праздников
@@ -304,6 +303,15 @@ def parse_azbyka_calendar_page(html_content: str) -> dict:
                 no_fast_text = soup.find(string=lambda text: text and "Поста нет." in text)
                 if no_fast_text:
                     calendar_data["fasting"] = no_fast_text.strip()
+
+    # Извлечение информации о седмице (Седмица 34-я по Пятидесятнице)
+    sedmica_link = soup.select_one('a[href*="sedmica"]')
+    if sedmica_link:
+        parent = sedmica_link.find_parent()
+        if parent:
+            week_text = parent.get_text(separator=" ", strip=True)
+            if week_text and "Седмица" in week_text:
+                calendar_data["week_info"] = week_text
 
     # Извлечение именин
     nameday_elements = soup.select('div.days-list-item__body a[href*="/days/svyatie/"]')
@@ -334,7 +342,17 @@ def parse_azbyka_calendar_page(html_content: str) -> dict:
             final_namedays.append(name)
     calendar_data["namedays"] = final_namedays
 
-    # Извлечение изображения, если оно есть
+    # Извлечение мыслей Феофана Затворника (если есть на azbyka)
+    feofan_section = soup.select_one('img[src*="feofan"]')
+    if feofan_section:
+        container = feofan_section.find_parent('div')
+        if container:
+            for p in container.select('p'):
+                thought = p.get_text(strip=True)
+                if thought and len(thought) > 20 and "Феофан" not in thought:
+                    calendar_data["theophan_thoughts"].append(thought)
+
+    # Извлечение изображения (не используем — calendar_data.image_url обнуляется в calendar_data.py)
     image_element = soup.select_one('div.days-main-info__image img')
     if image_element and image_element.has_attr('src'):
         image_src = image_element['src']

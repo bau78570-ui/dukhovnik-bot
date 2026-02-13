@@ -5,6 +5,7 @@ from aiogram.types import FSInputFile, InlineKeyboardMarkup, Message
 from aiogram.enums import ParseMode, ChatAction
 from aiogram.fsm.context import FSMContext
 from utils.html_parser import convert_markdown_to_html
+from core.image_utils import pick_local_image, is_external_url
 
 async def send_content_message(bot: Bot, chat_id: int, text: str, image_name: str = None, reply_markup: InlineKeyboardMarkup = None) -> Message | None:
     """
@@ -19,42 +20,34 @@ async def send_content_message(bot: Bot, chat_id: int, text: str, image_name: st
     """
     html_text = convert_markdown_to_html(text)
     
-    # Не используем изображения с pravoslavie.ru (риск претензий по авторским правам)
-    if image_name and ('pravoslavie.ru' in str(image_name) or 'days.pravoslavie' in str(image_name)):
-        logging.info(f"Пропуск изображения с pravoslavie.ru: {str(image_name)[:80]}...")
-        image_name = None
-    
+    # Никогда не используем изображения с внешних сайтов — только из нашей базы (assets/images/)
+    if image_name:
+        if is_external_url(image_name) or 'pravoslavie.ru' in str(image_name) or 'days.pravoslavie' in str(image_name) or 'azbyka.ru' in str(image_name):
+            logging.info(f"Пропуск внешнего изображения, используем локальное: {str(image_name)[:60]}...")
+            image_name = pick_local_image()
+        elif not os.path.exists(os.path.join('assets', 'images', image_name)):
+            image_name = pick_local_image() or image_name
+
     try:
-        if image_name:
-            # Проверяем, является ли image_name URL
-            if image_name.startswith('http://') or image_name.startswith('https://'):
+        if image_name and not is_external_url(image_name):
+            photo_path = os.path.join('assets', 'images', image_name)
+            if os.path.exists(photo_path):
+                photo = FSInputFile(photo_path)
                 sent_message = await bot.send_photo(
                     chat_id=chat_id,
-                    photo=image_name, # Передаем URL напрямую
+                    photo=photo,
                     caption=html_text,
                     parse_mode=ParseMode.HTML,
                     reply_markup=reply_markup
                 )
             else:
-                # Если это не URL, то это локальный путь к файлу
-                photo_path = os.path.join('assets', 'images', image_name)
-                if os.path.exists(photo_path):
-                    photo = FSInputFile(photo_path)
-                    sent_message = await bot.send_photo(
-                        chat_id=chat_id,
-                        photo=photo,
-                        caption=html_text,
-                        parse_mode=ParseMode.HTML,
-                        reply_markup=reply_markup
-                    )
-                else:
-                    logging.warning(f"Изображение не найдено локально: {photo_path}. Отправляем только текст.")
-                    sent_message = await bot.send_message(
-                        chat_id=chat_id,
-                        text=html_text,
-                        parse_mode=ParseMode.HTML,
-                        reply_markup=reply_markup
-                    )
+                logging.warning(f"Изображение не найдено локально: {photo_path}. Отправляем только текст.")
+                sent_message = await bot.send_message(
+                    chat_id=chat_id,
+                    text=html_text,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=reply_markup
+                )
         else:
             sent_message = await bot.send_message(
                 chat_id=chat_id,
