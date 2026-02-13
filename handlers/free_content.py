@@ -87,12 +87,12 @@ async def calendar_handler(message: Message, bot: Bot, state: FSMContext):
         )
 
         builder = InlineKeyboardBuilder()
-        
-        # Используем изображение из базы бота (daily_word), не с pravoslavie.ru
+
+        # Изображение из нашей базы (daily_word), fallback — logo.png
         morning_image_filename = pick_daily_word_image_filename()
         calendar_image = f"daily_word/{morning_image_filename}" if morning_image_filename else "logo.png"
-        logging.info(f"Calendar /calendar: image_name={calendar_image!r}, image_url из данных={calendar_data.get('image_url')!r}")
-        
+        logging.info(f"Calendar /calendar: image_name={calendar_image!r}")
+
         await send_and_delete_previous(
             bot=bot,
             chat_id=chat_id,
@@ -165,8 +165,8 @@ async def molitva_handler(message: Message, bot: Bot, state: FSMContext):
     builder.button(text="Своими словами", callback_data="prayer_topic:custom")
     builder.adjust(2)
 
-    # Изображение только из нашей базы: daily_quote.png → daily_word/ → logo.png
-    molitva_image = pick_local_image(prefer='daily_quote.png')
+    # Изображение из нашей базы (daily_word), fallback — daily_quote.png или logo.png
+    molitva_image = pick_local_image(prefer='daily_word') or pick_local_image(prefer='daily_quote.png') or 'logo.png'
     sent_message = await send_content_message(
         bot=bot,
         chat_id=message.chat.id,
