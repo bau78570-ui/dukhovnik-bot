@@ -12,6 +12,7 @@ from aiogram.enums import ChatAction
 from aiogram.fsm.context import FSMContext # Импортируем FSMContext
 from core.content_sender import send_and_delete_previous, send_content_message # Импортируем новую централизованную функцию
 from core.calendar_data import get_calendar_data, fetch_and_cache_calendar_data
+from core.scheduler import pick_daily_word_image_filename
 from core.user_database import get_user # Импортируем get_user
 from core.subscription_checker import activate_trial # Импортируем activate_trial
 from core.yandex_metrika import track_feature_used # Импортируем Яндекс.Метрику
@@ -86,31 +87,21 @@ async def calendar_handler(message: Message, bot: Bot, state: FSMContext):
 
         builder = InlineKeyboardBuilder()
         
-        # Отправляем сообщение с изображением, если оно есть
-        image_url = calendar_data.get("image_url")
-        if image_url:
-            await send_and_delete_previous(
-                bot=bot,
-                chat_id=chat_id,
-                state=state,
-                text=main_caption_text,
-                image_name=image_url, # Предполагаем, что image_url здесь - это относительный путь к файлу
-                reply_markup=builder.as_markup(),
-                show_typing=False,
-                delete_previous=False, # Не удаляем предыдущее сообщение (команду пользователя)
-                track_last_message=False
-            )
-        else:
-            await send_and_delete_previous(
-                bot=bot,
-                chat_id=chat_id,
-                state=state,
-                text=main_caption_text,
-                reply_markup=builder.as_markup(),
-                show_typing=False,
-                delete_previous=False, # Не удаляем предыдущее сообщение (команду пользователя)
-                track_last_message=False
-            )
+        # Используем изображение из базы бота (daily_word), не с pravoslavie.ru
+        morning_image_filename = pick_daily_word_image_filename()
+        calendar_image = f"daily_word/{morning_image_filename}" if morning_image_filename else None
+        
+        await send_and_delete_previous(
+            bot=bot,
+            chat_id=chat_id,
+            state=state,
+            text=main_caption_text,
+            image_name=calendar_image,
+            reply_markup=builder.as_markup(),
+            show_typing=False,
+            delete_previous=False, # Не удаляем предыдущее сообщение (команду пользователя)
+            track_last_message=False
+        )
 
         # Отдельное сообщение для мыслей Феофана Затворника, если они есть
         theophan_thoughts = calendar_data.get('theophan_thoughts', [])

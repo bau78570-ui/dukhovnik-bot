@@ -110,6 +110,39 @@ def strip_section_label(text: str, label: str) -> str:
     
     return text
 
+
+def remove_duplicate_exhortation(text: str) -> str:
+    """
+    Удаляет дублирование "Напутствие на день:" в тексте напутствия.
+    AI иногда возвращает: "Текст. Напутствие на день: Текст. Ещё текст" — оставляем только уникальную часть.
+    """
+    if not text:
+        return ""
+    dup_pattern = r'(?is)\s*напутствие\s+на\s+день\s*[:\-]\s*'
+    parts = re.split(dup_pattern, text)
+    if len(parts) <= 1:
+        return text.strip()
+    first = parts[0].strip()
+    rest = parts[1].strip()
+    if not rest:
+        return first
+    # Удаляем из rest дубликат начала first (по предложениям)
+    first_sents = re.split(r'(?<=[.!?])\s+', first)
+    rest_sents = re.split(r'(?<=[.!?])\s+', rest)
+    skip = 0
+    for i, rs in enumerate(rest_sents):
+        if i >= len(first_sents):
+            break
+        fs = first_sents[i]
+        if len(fs) >= 20 and len(rs) >= 20 and fs[:30] == rs[:30]:
+            skip = i + 1
+        else:
+            break
+    if skip > 0:
+        unique = ' '.join(rest_sents[skip:]).strip()
+        return (first + ' ' + unique).strip() if unique else first
+    return text.strip()
+
 def build_evening_prayer_by_index(index: int) -> str:
     parts = evening_prayer_parts
     openings = parts.get("openings", [])
@@ -283,19 +316,23 @@ async def send_morning_notification(bot: Bot):
     if not morning_theme and ical_url:
         morning_theme = await get_calendar_theme_from_ical(ical_url)
 
+    week_info = calendar_data.get("week_info", "")
     # Генерируем утреннюю молитву и напутствие
     morning_prayer, morning_exhortation = get_morning_fallback_message(today.date())
     
     # Формируем контекстный промпт с текущей датой и строгими инструкциями о хронологии
     current_date_str = today.strftime("%d.%m.%Y")  # Например: "28.01.2026"
+    theme_line = f"Тема дня: {morning_theme}\n" if morning_theme else ""
+    week_line = f"Седмица (НЕ повторяй этот текст в напутствии): {week_info}\n" if week_info and week_info != "Информация о седмице не найдена." else ""
     
     morning_prompt = (
         f"ВАЖНО: Сегодня {current_date_str}. Текущий год: {today.year}.\n\n"
         "Составь утреннее приветствие для православного бота.\n"
-        "Структура ответа:\n"
+        "Структура ответа (строго соблюдай):\n"
         "Молитва: <краткая молитва в каноническом православном стиле, как из молитвослова, 2-4 предложения>\n"
         "Напутствие: <глубокое напутствие на день, 3-5 предложений, связь с Писанием, церковной жизнью или святым>\n\n"
-        f"{'Тема дня: ' + morning_theme + '\n' if morning_theme else ''}"
+        "НЕ дублируй в напутствии текст. Пиши только ОДИН блок Напутствие:, без заголовка 'Напутствие на день' в тексте.\n\n"
+        f"{theme_line}{week_line}"
         "КРИТИЧЕСКИ ВАЖНЫЕ ПРАВИЛА О ДАТАХ И ХРОНОЛОГИИ:\n"
         "1. Говори ТОЛЬКО о событиях, которые актуальны СЕГОДНЯ или УЖЕ произошли в текущем году.\n"
         "2. НИКОГДА не упоминай события из будущего как уже произошедшие. Проверяй хронологию по текущей дате.\n"
@@ -322,6 +359,7 @@ async def send_morning_notification(bot: Bot):
     # Приветствие с изображением
     morning_prayer_clean = strip_section_label(sanitize_plain_text(morning_prayer), "молитва")
     morning_exhortation_clean = strip_section_label(sanitize_plain_text(morning_exhortation), "напутствие")
+    morning_exhortation_clean = remove_duplicate_exhortation(morning_exhortation_clean)
     
     logging.debug(f"После очистки - Молитва: {len(morning_prayer_clean)} символов")
     logging.debug(f"После очистки - Напутствие (первые 100 символов): {morning_exhortation_clean[:100]}")
@@ -369,12 +407,12 @@ async def send_morning_notification(bot: Bot):
                         image_name=greeting_image
                     )
 
-                    image_url = calendar_data.get("image_url")
+                    # Календарь без изображения с pravoslavie.ru (избегаем претензий по авторским правам)
                     await send_content_message(
                         bot=bot,
                         chat_id=user_id,
                         text=main_caption_text,
-                        image_name=image_url
+                        image_name=None
                     )
 
                     if theophan_message_text:
