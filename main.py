@@ -20,7 +20,7 @@ from handlers.subscription import router as subscription_router
 from core.scheduler import scheduler, send_morning_notification, send_afternoon_notification, send_evening_notification, send_subscription_reminder, send_free_period_ending_notification # check_namedays
 from core.subscription_checker import check_access # Импортируем мидлварь проверки доступа
 from core.user_database import user_db, get_user # Импортируем user_db и get_user
-# from core.calendar_data import cached_calendar_data # Импортируем кэш календаря
+from core.calendar_data import clear_calendar_cache
 
 # Настройка логирования с ротацией файлов
 from logging.handlers import RotatingFileHandler
@@ -95,6 +95,8 @@ async def main() -> None:
     Основная функция для запуска long polling.
     """
     import traceback
+    clear_calendar_cache()  # Сброс кэша при старте (убирает старые данные с image_url с сайтов)
+
     logging.info("="*80)
     logging.info("🚀 ЗАПУСК ФУНКЦИИ main() - НАЧАЛО ИНИЦИАЛИЗАЦИИ БОТА")
     logging.info(f"Время запуска: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")

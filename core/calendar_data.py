@@ -5,6 +5,11 @@ from utils.html_parser import fetch_html_content, parse_pravoslavie_calendar_pag
 # Этот файл будет хранить кэшированные данные православного календаря.
 
 cached_calendar_data = {}
+
+def clear_calendar_cache():
+    """Очищает кэш календаря (вызвать при старте бота, чтобы сбросить старые данные с image_url)."""
+    cached_calendar_data.clear()
+
 PRAVOSLAVIE_BASE_URL = "https://days.pravoslavie.ru/Days/"
 AZBYKA_BASE_URL = "https://azbyka.ru/days/"
 
@@ -74,7 +79,7 @@ async def fetch_and_cache_calendar_data(date_str: str):
     if pravoslavie_new_style_equivalent_html_content:
         pravoslavie_data = parse_pravoslavie_calendar_page(pravoslavie_new_style_equivalent_html_content)
         if pravoslavie_data:
-            # Приоритет для theophan_thoughts из pravoslavie.ru (image_url не берём)
+            # Приоритет для theophan_thoughts из pravoslavie.ru (image_url не берём — парсеры его не возвращают)
             if pravoslavie_data.get("theophan_thoughts"):
                 final_calendar_data["theophan_thoughts"] = pravoslavie_data["theophan_thoughts"]
             

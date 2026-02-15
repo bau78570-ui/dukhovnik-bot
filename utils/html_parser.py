@@ -106,7 +106,6 @@ def parse_pravoslavie_calendar_page(html_content: str) -> dict:
         "week_info": "",
         "theophan_thoughts": [],
         "fasting": "Информация о посте не найдена.",
-        "image_url": None,
         "namedays": []
     }
 
@@ -270,7 +269,6 @@ def parse_azbyka_calendar_page(html_content: str) -> dict:
         "namedays": [],
         "week_info": "",
         "theophan_thoughts": [],
-        "image_url": None,
     }
 
     # Извлечение праздников
