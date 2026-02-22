@@ -1,7 +1,7 @@
 import os
 from typing import Any, Dict, List, Optional
-import aiohttp
-from dotenv import load_dotenv
+import aiohttp # type: ignore
+from dotenv import load_dotenv # type: ignore
 
 # Загружаем переменные окружения
 load_dotenv()
@@ -105,7 +105,7 @@ async def get_ai_response(user_message: str, conversation_history: Optional[List
         # Удаляем квадратные скобки (используются для маркировки секций промпта)
         sanitized_name = sanitized_name.replace('[', '').replace(']', '')
         # Ограничиваем длину (максимум 50 символов)
-        sanitized_name = sanitized_name[:50]
+        sanitized_name = sanitized_name[:50] # type: ignore
         # Удаляем множественные пробелы
         sanitized_name = ' '.join(sanitized_name.split())
         
